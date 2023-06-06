@@ -5,6 +5,9 @@ from opensoundscape import CNN
 ## see instructions here: 
 ## https://pytorch.org/docs/stable/hub.html#torch.hub.load_state_dict_from_url
 
+# to create direct download links for OneDrive, follow these instructions:
+# https://learn.microsoft.com/en-us/graph/api/shares-get?view=graph-rest-1.0&tabs=http#encoding-sharing-urls 
+
 # BUILTIN_MODELS = {}
 
 # def register_model(name: Optional[str] = None) -> Callable[[Callable[..., M]], Callable[..., M]]:
@@ -20,10 +23,31 @@ from opensoundscape import CNN
 # @register_model
 def rana_sierrae_cnn(pretrained=True):
   """Load CNN that detects Rana Sierrae vocalizations"""
-  model = CNN(# add params to configure)
+   
+  ## Create model object ##
   
-  #make any necessary adjustments here
+  # create opensoundscape.CNN object to train a CNN on audio
+  model = CNN(architecture='resnet18',classes=['rana_sierrae', 'negative'],sample_duration=2.0,single_target=True)
   
-  model.load_state_dict(torch.hub.load_state_dict_from_url('a/public/url.pth', progress=False))
+  ## Preprocessing Parameters ##
+  
+  #modify preprocessing of the CNN:
+  #bandpass spectrograms to 300-2000 Hz
+  model.preprocessor.pipeline.bandpass.set(min_f=300,max_f=2000)
+  
+  ## Training Parameters ##
+  
+  #modify augmentation routine parameters
+  model.preprocessor.pipeline.frequency_mask.set(max_masks=5,max_width=0.1)
+  model.preprocessor.pipeline.time_mask.set(max_masks=5,max_width=0.1)
+  model.preprocessor.pipeline.add_noise.set(std=0.01)
+
+  # decrease the learning rate from the default value
+  model.optimizer_params['lr']=0.002
+  
+  ## Load pre-trained weights ##
+  if pretrained:
+    url='https://pitt-my.sharepoint.com/:u:/g/personal/jaklab_pitt_edu/EVzg8_qa15JDg2UAioaypqABIf5pUnHGwKRCKrfCNkAgug?e=ye9UwZ&download=1'
+    model.load_state_dict(torch.hub.load_state_dict_from_url(url, progress=False))
   
   return model
