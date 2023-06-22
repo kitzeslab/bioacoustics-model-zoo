@@ -22,7 +22,7 @@ from opensoundscape import CNN
   
 # @register_model
 def rana_sierrae_cnn(pretrained=True):
-  """Load CNN that detects Rana Sierrae vocalizations"""
+  """Load CNN that detects Rana sierrae vocalizations"""
    
   ## Create model object ##
   
@@ -49,6 +49,6 @@ def rana_sierrae_cnn(pretrained=True):
   if pretrained:
     dropbox_url = 'https://www.dropbox.com/s/9uw1j8yvr75d1dl/BMZ0001_rana_seirrae_cnn_v1-0.model?dl=0'
     download_url = dropbox_url.replace('dropbox.com','dl.dropboxusercontent.com')
-    model.load_state_dict(torch.hub.load_state_dict_from_url(download_url, progress=False))
+    model.network.load_state_dict(torch.hub.load_state_dict_from_url(download_url, progress=False))
   
   return model
