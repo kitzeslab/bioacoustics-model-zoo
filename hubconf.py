@@ -47,7 +47,8 @@ def rana_sierrae_cnn(pretrained=True):
   
   ## Load pre-trained weights ##
   if pretrained:
-    url='https://pitt-my.sharepoint.com/:u:/g/personal/jaklab_pitt_edu/EVzg8_qa15JDg2UAioaypqABIf5pUnHGwKRCKrfCNkAgug?e=ye9UwZ&download=1'
-    model.load_state_dict(torch.hub.load_state_dict_from_url(url, progress=False))
+    dropbox_url = 'https://www.dropbox.com/s/9uw1j8yvr75d1dl/BMZ0001_rana_seirrae_cnn_v1-0.model?dl=0'
+    download_url = dropbox_url.replace('dropbox.com','dl.dropboxusercontent.com')
+    model.load_state_dict(torch.hub.load_state_dict_from_url(download_url, progress=False))
   
   return model
