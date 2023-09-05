@@ -1,0 +1,7 @@
+numpy
+pandas
+torch
+tensorflow_hub
+tensorflow
+tqdm
+opensoundscape

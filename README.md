@@ -18,7 +18,7 @@ model = torch.hub.load('kitzeslab/bioacoustics-model-zoo','rana_sierrae_cnn')
 
 ### Inference:
 
-`model` is an OpenSoundscape CNN object which you can use as normal. 
+`model` is an OpenSoundscape CNN object (or other class) which you can use as normal. 
 
 For instance, use the model to generate predictions on an audio file: 
 
@@ -27,3 +27,9 @@ audio_file_path = './hydrophone_10s.wav'
 scores = model.predict([audio_file_path],activation_layer='softmax')
 scores
 ```
+
+# Model list
+
+`rana_sierrae_cnn`: detect underwater vocalizations of Rana sierrae 
+
+``
