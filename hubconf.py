@@ -1,7 +1,10 @@
 dependencies = ["torch", "opensoundscape", "tensorflow"]
 import torch
-from opensoundscape import CNN
 
+# import with leading underscore to hide from torch.hub.list()
+from opensoundscape import CNN as _CNN
+
+# each function we import will be visible in torch.hub.list()
 from bioacoustics_model_zoo.google_bird_vocalization_classifier import (
     google_bird_vocalization_classifier,
 )
@@ -33,7 +36,7 @@ def rana_sierrae_cnn(pretrained=True):
     ## Create model object ##
 
     # create opensoundscape.CNN object to train a CNN on audio
-    model = CNN(
+    model = _CNN(
         architecture="resnet18",
         classes=["rana_sierrae", "negative"],
         sample_duration=2.0,
