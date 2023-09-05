@@ -11,31 +11,10 @@ from tqdm.autonotebook import tqdm
 from opensoundscape.ml.cnn import BaseClassifier
 
 
-def collate_to_np_array(audio_samples):
-    """
-    takes list of AudioSample objects with type(sample.data)==opensoundscape.Audio
-    and returns np.array of shape [batch, length of audio signal]
-    """
-    try:
-        return np.array([a.data.samples for a in audio_samples])
-    except Exception as exc:
-        raise ValueError(
-            "Must pass list of AudioSample with Audio object as .data"
-        ) from exc
-
-
-class AudioSampleArrayDataloader(SafeAudioDataloader):
-    def __init__(self, *args, **kwargs):
-        """Load samples with specific collate function
-
-        Collate function takes list of AudioSample objects with type(.data)=opensoundscape.Audio
-        and returns np.array of shape [batch, length of audio signal]
-
-        Args:
-            see SafeAudioDataloader
-        """
-        kwargs.update({"collate_fn": collate_to_np_array})
-        super(AudioSampleArrayDataloader, self).__init__(*args, **kwargs)
+from bioacoustics_model_zoo.utils import (
+    collate_to_np_array,
+    AudioSampleArrayDataloader,
+)
 
 
 # TODO: update url to v3 when its no longer broken
@@ -46,18 +25,18 @@ def google_bird_vocalization_classifier(
 
 
 class GoogleBirdVocalizationClassifier(BaseClassifier):
-    """load TF model hub google Perch model, wrap in OpSo TensorFlowHubModel class
+    """load TF model hub google Perch model, wrap in OpSo class
 
     Args:
         url to model path (default is Google-Bird-Vocalization-Classifier v3)
 
     Returns:
-        opensoundscape.TensorFlowHubModel object with .predict() method for inference
+        object with .predict(), .embed() etc methods
 
     Methods:
         predict: get per-audio-clip per-class scores in dataframe format; includes WandB logging
         generate_embeddings: make embeddings for audio data (feature vectors from penultimate layer)
-        generate_logits_and_embeddings: returns (logits, embeddings)
+        generate_embeddings_and_logits: returns (embeddings, logits)
     """
 
     def __init__(self, url="https://tfhub.dev/google/bird-vocalization-classifier/2"):
@@ -67,7 +46,7 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
             url to model path (default is Perch v3)
 
         Returns:
-            opensoundscape.TensorFlowHubModel object with .predict() method for inference
+            object with .predict(), .embed() etc methods
         """
         self.network = tensorflow_hub.load(url)
         self.preprocessor = AudioPreprocessor(sample_duration=5, sample_rate=32000)
@@ -130,7 +109,7 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
         return self(dataloader, return_embeddings=False, return_logits=True)
 
-    def generate_logits_and_embeddings(self, samples, **kwargs):
+    def generate_embeddings_and_logits(self, samples, **kwargs):
         """Return (logits, embeddings) for audio data
 
         Args:
