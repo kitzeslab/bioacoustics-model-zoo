@@ -38,8 +38,9 @@ class AudioSampleArrayDataloader(SafeAudioDataloader):
         super(AudioSampleArrayDataloader, self).__init__(*args, **kwargs)
 
 
+# TODO: update url to v3 when its no longer broken
 def google_bird_vocalization_classifier(
-    url="https://tfhub.dev/google/bird-vocalization-classifier/3",
+    url="https://tfhub.dev/google/bird-vocalization-classifier/2",
 ):
     return GoogleBirdVocalizationClassifier(url)
 
@@ -59,7 +60,7 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
         generate_logits_and_embeddings: returns (logits, embeddings)
     """
 
-    def __init__(self, url="https://tfhub.dev/google/bird-vocalization-classifier/3"):
+    def __init__(self, url="https://tfhub.dev/google/bird-vocalization-classifier/2"):
         """load TF model hub google Perch model, wrap in OpSo TensorFlowHubModel class
 
         Args:
