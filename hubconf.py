@@ -9,6 +9,9 @@ from bioacoustics_model_zoo.google_bird_vocalization_classifier import (
     google_bird_vocalization_classifier,
 )
 from bioacoustics_model_zoo.birdnet import birdnet
+from bioacoustics_model_zoo.mixit_separation import SeparationModel
+
+# do we need functions or can they be classes?
 
 ## see instructions here:
 ## https://pytorch.org/docs/stable/hub.html#torch.hub.load_state_dict_from_url
