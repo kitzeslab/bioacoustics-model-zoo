@@ -241,7 +241,7 @@ class YamNET(BaseClassifier):
         scores, _, _, start_times, files = self(dataloader)
         return pd.DataFrame(
             index=pd.MultiIndex.from_arrays(
-                [files, start_times, start_times + 0.96],
+                [files, start_times, np.array(start_times) + 0.96],
                 names=["file", "start_time", "end_time"],
             ),
             data=scores,
