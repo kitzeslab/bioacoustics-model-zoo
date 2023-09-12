@@ -119,11 +119,11 @@ class YamNET(BaseClassifier):
 
         # TODO: handle outputs by calculating start and end times of each frame
         return (
-            logits.numpy(),
-            embeddings.numpy(),
-            logmelspec.numpy(),
-            np.array(start_times),
-            np.array(files),
+            logits,
+            embeddings,
+            logmelspec,
+            start_times,
+            files,
         )
 
     def generate_embeddings(self, samples, **kwargs):
@@ -159,7 +159,7 @@ class YamNET(BaseClassifier):
         _, embeddings, _, start_times, files = self(dataloader)
         return pd.DataFrame(
             index=pd.MultiIndex.from_arrays(
-                [files, start_times, start_times + 0.96],
+                [files, start_times, np.array(start_times) + 0.96],
                 names=["file", "start_time", "end_time"],
             ),
             data=embeddings,
