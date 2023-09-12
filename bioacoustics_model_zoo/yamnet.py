@@ -44,9 +44,9 @@ class YamNET(BaseClassifier):
         object with .predict(), .embed() etc methods
 
     Methods:
-        predict: get per-audio-clip per-class scores in dataframe format; includes WandB logging
+        predict: get per-audio-clip per-class scores in dataframe format
         generate_embeddings: make embeddings for audio data (feature vectors from penultimate layer)
-        generate_embeddings_and_logits: returns (embeddings, logits)
+        generate_embeddings_df: returns dataframe of embeddings with file, start_time, end_time as index
     """
 
     def __init__(self, url="https://tfhub.dev/google/yamnet/1", input_duration=60):
@@ -147,6 +147,10 @@ class YamNET(BaseClassifier):
             Note: more return values than rows in input df, since YamNET internally
             batches and windows the audio into 0.96 sec clips with 0.48 sec overlap
         """
+        kwargs.update({"batch_size": 1})
+        # since YamNET internally batches and windows the audio, it makes sense to use partial
+        # "remainder" mode even if we get less than sample_duration, eg 60 sec
+        kwargs.update({"final_clip": "remainder"})
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
         _, embeddings, _, _, _ = self(dataloader)
         return embeddings
@@ -161,6 +165,10 @@ class YamNET(BaseClassifier):
             pd.DataFrame of embedding vectors, wwith (file, start_time, end_time) as index
             Note: returns more rows than inputs because of internal frame/windowing
         """
+        kwargs.update({"batch_size": 1})
+        # since YamNET internally batches and windows the audio, it makes sense to use partial
+        # "remainder" mode even if we get less than sample_duration, eg 60 sec
+        kwargs.update({"final_clip": "remainder"})
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
         _, embeddings, _, start_times, files = self(dataloader)
         return pd.DataFrame(
@@ -188,6 +196,10 @@ class YamNET(BaseClassifier):
             Note: more return values than rows in input df, since YamNET internally
             batches and windows the audio into 0.96 sec clips with 0.48 sec overlap
         """
+        kwargs.update({"batch_size": 1})
+        # since YamNET internally batches and windows the audio, it makes sense to use partial
+        # "remainder" mode even if we get less than sample_duration, eg 60 sec
+        kwargs.update({"final_clip": "remainder"})
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
         logits, _, _, _, _ = self(dataloader)
         return logits
@@ -209,6 +221,10 @@ class YamNET(BaseClassifier):
             n: number of inputs
             m: number of frames per input (input_length // .48 or one less)
         """
+        kwargs.update({"batch_size": 1})
+        # since YamNET internally batches and windows the audio, it makes sense to use partial
+        # "remainder" mode even if we get less than sample_duration, eg 60 sec
+        kwargs.update({"final_clip": "remainder"})
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
         _, _, logmelspecs, _, _ = self(dataloader)
         return logmelspecs
