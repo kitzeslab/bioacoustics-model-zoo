@@ -115,11 +115,12 @@ class YamNET(BaseClassifier):
             batch_start_times = np.arange(
                 i * self.input_duration, (i + 1) * self.input_duration, 0.48
             )
-            # we might get one extra start time at the end
-            if len(batch_start_times) == len(batch_logits) + 1:
-                batch_start_times = batch_start_times[: len(batch_logits)]
-
+            # we might get extra start time at the end
+            batch_start_times = batch_start_times[: len(batch_logits)]
             start_times.extend(batch_start_times)
+
+            # same file repeated for all frames in batch
+            # AudioSample.source is the file path
             files.extend([batch[0].source] * len(batch_logits))
 
         # TODO: handle outputs by calculating start and end times of each frame
