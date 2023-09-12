@@ -29,8 +29,9 @@ from opensoundscape.ml.cnn import BaseClassifier
 
 def yamnet(
     url="https://tfhub.dev/google/yamnet/1",
+    input_duration=60,
 ):
-    return YamNET(url)
+    return YamNET(url, input_duration)
 
 
 class YamNET(BaseClassifier):
@@ -237,6 +238,9 @@ class YamNET(BaseClassifier):
             Note: returns more rows than inputs because of internal frame/windowing
         """
         kwargs.update({"batch_size": 1})
+        # since YamNET internally batches and windows the audio, it makes sense to use partial
+        # "remainder" mode even if we get less than sample_duration, eg 60 sec
+        kwargs.update({"final_clip": "remainder"})
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
         scores, _, _, start_times, files = self(dataloader)
         return pd.DataFrame(
