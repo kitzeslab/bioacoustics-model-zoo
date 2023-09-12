@@ -21,6 +21,11 @@ class SeparationModel(object):
     ):
         """Initializes the separation model from checkpoint
 
+        note: to use this class with torch.hub.load(), you must provide the
+        checkpoint='/path/to/downloaded/checkpoint'. To download the MixIt checkpoint,
+        run `gsutil -m cp -r gs://gresearch/sound_separation/bird_mixit_model_checkpoints .`
+        or see instructions on the [MixIt Github repo](https://github.com/google-research/sound-separation/blob/master/models/bird_mixit/README.md)
+
         Args:
             checkpoint: location of the checkpoint to load
                 eg /path/bird_mixit_model_checkpoints/output_sources4/model.ckpt-3223090
