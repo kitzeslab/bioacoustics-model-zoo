@@ -66,7 +66,7 @@ class YamNET(BaseClassifier):
         self.network = tensorflow_hub.load(url)
         self.input_duration = input_duration
         self.preprocessor = AudioPreprocessor(
-            sample_duration=input_duration, sample_rate=32000
+            sample_duration=input_duration, sample_rate=16000
         )
         # the dataloader returns a list of AudioSample objects, with .data as audio waveform samples
         self.inference_dataloader_cls = SafeAudioDataloader
