@@ -3,7 +3,6 @@ from pathlib import Path
 import torch
 import pandas as pd
 import numpy as np
-import tensorflow_hub
 
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
@@ -48,6 +47,17 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
         Returns:
             object with .predict(), .embed() etc methods
         """
+        # only require tensorflow and tensorflow_hub if/when this class is used
+        try:
+            import tensorflow
+            import tensorflow_hub
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "GoogleBirdVocalizationClassifier requires tensorflow and "
+                "tensorflow_hub packages to be installed. "
+                "Install in your python environment with `pip install tensorflow tensorflow_hub`"
+            ) from exc
+
         self.network = tensorflow_hub.load(url)
         self.preprocessor = AudioPreprocessor(sample_duration=5, sample_rate=32000)
         self.inference_dataloader_cls = AudioSampleArrayDataloader

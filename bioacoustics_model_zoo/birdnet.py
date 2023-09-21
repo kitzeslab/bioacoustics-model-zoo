@@ -4,12 +4,6 @@ import torch
 import pandas as pd
 import numpy as np
 
-# copying this import logit from BirdNet-Analyzer
-# try:
-#     import tflite_runtime.interpreter as tflite
-# except ModuleNotFoundError:
-from tensorflow import lite as tflite
-
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
@@ -61,6 +55,15 @@ class BirdNetTFLite(BaseClassifier):
         Returns:
             object with .predict() method for inference
         """
+        # only require tensorflow if/when this class is used
+        try:
+            from tensorflow import lite as tflite
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "BirdNet requires tensorflow package to be installed. "
+                "Install in your python environment with `pip install tensorflow`"
+            ) from exc
+
         # download model if URL, otherwise find it at local path:
         if checkpoint_url.startswith("http"):
             print("downloading model from URL...")

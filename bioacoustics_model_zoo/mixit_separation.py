@@ -1,7 +1,4 @@
-# cod efrom https://github.com/google-research/sound-separation/blob/master/models/tools/process_wav.py
-
-import tensorflow.compat.v1 as tf
-
+# code from https://github.com/google-research/sound-separation/blob/master/models/tools/process_wav.py
 import os
 from opensoundscape.audio import Audio
 from pathlib import Path
@@ -41,7 +38,14 @@ class SeparationModel(object):
             separate_audio: separates an opensoundscape.Audio object into sources
                 (returns list of Audio)
         """
-
+        # only require tensorflow if/when this class is used
+        try:
+            import tensorflow.compat.v1 as tf
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "SeparationModel requires tensorflow package to be installed. "
+                "Install in your python environment with `pip install tensorflow`"
+            ) from exc
         # TODO allow download of checkpoint from a public url without gsutil
 
         # make sure checkpoint doesn't include .data-00000-of-00001 or .index

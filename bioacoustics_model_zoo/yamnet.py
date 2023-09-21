@@ -1,7 +1,4 @@
 """load the pre-trained YamNET model for general audio embedding/classifier"""
-
-import tensorflow as tf
-import tensorflow_hub
 import numpy as np
 import csv
 import io
@@ -17,9 +14,6 @@ def class_names_from_csv(class_map_csv_text):
     class_names = class_names[1:]  # Skip CSV header
     return class_names
 
-
-import numpy as np
-import tensorflow_hub
 
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
@@ -48,6 +42,16 @@ class YamNET(BaseClassifier):
         generate_embeddings: make embeddings for audio data (feature vectors from penultimate layer)
         generate_embeddings_df: returns dataframe of embeddings with file, start_time, end_time as index
     """
+
+    # only require tensorflow and tensorflow_hub if/when this class is used
+    try:
+        import tensorflow as tf
+        import tensorflow_hub
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "YamNET requires tensorflow and tensorflow_hub packages to be installed. "
+            "Install in your python environment with `pip install tensorflow tensorflow_hub`"
+        ) from exc
 
     def __init__(self, url="https://tfhub.dev/google/yamnet/1", input_duration=60):
         """load TF model hub google Perch model, wrap in OpSo TensorFlowHubModel class
