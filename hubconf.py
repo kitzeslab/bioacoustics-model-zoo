@@ -27,7 +27,7 @@ from bioacoustics_model_zoo.perch import perch
 #     def wrapper(fn: Callable[..., M]) -> Callable[..., M]:
 #         key = name if name is not None else fn.__name__
 #         if key in BUILTIN_MODELS:
-#             raise ValueError(f"An entry is already registered under the name '{key}'.")
+#             raise ValueError(f"An entry is already registered under the name '{key}'.")sc
 #         BUILTIN_MODELS[key] = fn
 #         return fn
 

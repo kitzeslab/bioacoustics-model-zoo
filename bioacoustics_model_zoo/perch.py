@@ -64,25 +64,10 @@ class Perch(BaseClassifier):
         # load tensorflow model
         import tensorflow as tf
 
-        model_path = (
-            "/Users/SML161/bioacoustics-model-zoo/resources/perch_0.1.2/savedmodel/"
-        )
-        self.network = tf.saved_model.load(model_path)
-
-        # load class list:
-        # if label_url.startswith("http"):
-        #     label_path = download_github_file(label_url)
-        # else:
-        #     label_path = label_url
-        # label_path = Path(label_path).resolve()  # get absolute path
-        # assert label_path.exists(), f"Label path {label_path} does not exist"
-
-        # labels.txt is a single column of class names without a header
-        # self.classes = pd.read_csv(label_path, header=None)[0].values
+        self.network = tf.saved_model.load(Path(model_dir) / "savedmodel")
 
         # load class list
-        resources = Path(__file__).parent.parent / "resources"
-        label_csv = resources / "perch_0.1.2/label.csv"
+        label_csv = Path(model_dir) / "label.csv"
         # "google-bird-vocalization-classifier_v3_classes.csv"
         self.classes = pd.read_csv(label_csv)["ebird2021"].values
 
