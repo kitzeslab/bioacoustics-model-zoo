@@ -11,6 +11,7 @@ from bioacoustics_model_zoo.google_bird_vocalization_classifier import (
 from bioacoustics_model_zoo.birdnet import birdnet
 from bioacoustics_model_zoo.mixit_separation import SeparationModel
 from bioacoustics_model_zoo.yamnet import yamnet
+from bioacoustics_model_zoo.perch import perch
 
 # do we need functions or can they be classes?
 
