@@ -86,8 +86,8 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
             batch_logits, batch_embeddings = self.network.infer_tf(samples_batch)
             logits.extend(batch_logits.numpy().tolist())
             embeddings.extend(batch_embeddings.numpy().tolist())
-            start_times = [s.start_time for s in batch]
-            files = [s.source for s in batch]
+            start_times.extend([s.start_time for s in batch])
+            files.extend([s.source for s in batch])
         return (np.array(i) for i in (logits, embeddings, start_times, files))
 
     def generate_embeddings(self, samples, **kwargs):
