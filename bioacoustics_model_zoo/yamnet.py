@@ -127,7 +127,6 @@ class YamNET(BaseClassifier):
             # AudioSample.source is the file path
             files.extend([batch[0].source] * len(batch_logits))
 
-        # TODO: handle outputs by calculating start and end times of each frame
         return (
             logits,
             embeddings,

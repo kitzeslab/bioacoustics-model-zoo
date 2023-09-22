@@ -60,35 +60,35 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
 
         self.network = tensorflow_hub.load(url)
         self.preprocessor = AudioPreprocessor(sample_duration=5, sample_rate=32000)
-        self.inference_dataloader_cls = AudioSampleArrayDataloader
+        self.inference_dataloader_cls = (
+            SafeAudioDataloader  # AudioSampleArrayDataloader
+        )
+        self.sample_duration = 5
 
         # load class list
         resources = Path(__file__).parent.parent / "resources"
         label_csv = resources / "google-bird-vocalization-classifier_v3_classes.csv"
         self.classes = pd.read_csv(label_csv)["ebird2021"].values
 
-    def __call__(
-        self, dataloader, return_embeddings=False, return_logits=True, **kwargs
-    ):
-        """kwargs are passed to SafeAudioDataloader init (num_workers, batch_size, etc)"""
+    def __call__(self, dataloader, **kwargs):
+        """kwargs are passed to SafeAudioDataloader init (num_workers, batch_size, etc)
 
-        if not return_logits and not return_embeddings:
-            raise ValueError("Both return_logits and return_embeddings cannot be False")
+        returns logits, embeddings, start_times, files"""
 
         # iterate batches, running inference on each
         logits = []
         embeddings = []
+        logmelspec = []
+        start_times = []
+        files = []
         for batch in tqdm(dataloader):
-            batch_logits, batch_embeddings = self.network.infer_tf(batch)
+            samples_batch = collate_to_np_array(batch)
+            batch_logits, batch_embeddings = self.network.infer_tf(samples_batch)
             logits.extend(batch_logits.numpy().tolist())
             embeddings.extend(batch_embeddings.numpy().tolist())
-
-        if return_logits and return_embeddings:
-            return embeddings, logits
-        elif return_logits:
-            return logits
-        elif return_embeddings:
-            return embeddings
+            start_times = [s.start_time for s in batch]
+            files = [s.source for s in batch]
+        return (np.array(i) for i in (logits, embeddings, start_times, files))
 
     def generate_embeddings(self, samples, **kwargs):
         """Generate embeddings for audio data
@@ -104,7 +104,15 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
             list of embeddings
         """
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        return self(dataloader, return_embeddings=True, return_logits=False)
+        _, embeddings, start_times, files = self(dataloader)
+        end_times = start_times + self.sample_duration
+        return pd.DataFrame(
+            embeddings,
+            index=pd.MultiIndex.from_arrays(
+                [files, start_times, end_times],
+                names=["file", "start_time", "end_time"],
+            ),
+        )
 
     def generate_logits(self, samples, **kwargs):
         """Return (logits, embeddings) for audio data
@@ -117,7 +125,20 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
             **kwargs: any arguments to SafeAudioDataloader
         """
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        return self(dataloader, return_embeddings=False, return_logits=True)
+        logits, _, start_times, files = self(dataloader)
+        end_times = start_times + self.sample_duration
+        return pd.DataFrame(
+            logits,
+            index=pd.MultiIndex.from_arrays(
+                [files, start_times, end_times],
+                names=["file", "start_time", "end_time"],
+            ),
+            columns=self.classes,
+        )
+
+    def predict(self, samples, **kwargs):
+        """alias for generate_logits()"""
+        return self.generate_logits(samples, **kwargs)
 
     def generate_embeddings_and_logits(self, samples, **kwargs):
         """Return (logits, embeddings) for audio data
@@ -128,6 +149,26 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
                 - Dataframe with file as index
                 - Dataframe with file, start_time, end_time of clips as index
             **kwargs: any arguments to SafeAudioDataloader
+
+        returns 2 dataframes: (logits, embeddings)
         """
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        return self(dataloader, return_embeddings=True, return_logits=True)
+
+        logits, embeddings, start_times, files = self(dataloader)
+        end_times = start_times + self.sample_duration
+        logits_df = pd.DataFrame(
+            logits,
+            index=pd.MultiIndex.from_arrays(
+                [files, start_times, end_times],
+                names=["file", "start_time", "end_time"],
+            ),
+            columns=self.classes,
+        )
+        embeddings_df = pd.DataFrame(
+            embeddings,
+            index=pd.MultiIndex.from_arrays(
+                [files, start_times, end_times],
+                names=["file", "start_time", "end_time"],
+            ),
+        )
+        return logits_df, embeddings_df
