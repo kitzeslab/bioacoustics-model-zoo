@@ -1,1 +1,5 @@
 .DS_Store
+.vscode/settings.json
+__pycache__/
+resources/bird_mixit_model_checkpoints
+resources/perch_0.1.2
