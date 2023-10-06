@@ -150,7 +150,7 @@ class BirdNET(BaseClassifier):
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
         df_index = dataloader.dataset.dataset.label_df.index
         embeddings = self(dataloader, return_embeddings=True, return_logits=False)
-        return pd.DataFrame(index=df_index, data=embeddings, columns=self.classes)
+        return pd.DataFrame(index=df_index, data=embeddings)
 
     def generate_embeddings_and_logits(self, samples, **kwargs):
         """Return (logits, embeddings) dataframes for audio data
@@ -171,6 +171,6 @@ class BirdNET(BaseClassifier):
         )
         df_index = dataloader.dataset.dataset.label_df.index
         return (
-            pd.DataFrame(index=df_index, data=embeddings, columns=self.classes),
+            pd.DataFrame(index=df_index, data=embeddings),
             pd.DataFrame(index=df_index, data=logits, columns=self.classes),
         )
