@@ -18,20 +18,7 @@ from bioacoustics_model_zoo.perch import Perch
 # to create direct download links for OneDrive, follow these instructions:
 # https://learn.microsoft.com/en-us/graph/api/shares-get?view=graph-rest-1.0&tabs=http#encoding-sharing-urls
 
-# BUILTIN_MODELS = {}
 
-# def register_model(name: Optional[str] = None) -> Callable[[Callable[..., M]], Callable[..., M]]:
-#     def wrapper(fn: Callable[..., M]) -> Callable[..., M]:
-#         key = name if name is not None else fn.__name__
-#         if key in BUILTIN_MODELS:
-#             raise ValueError(f"An entry is already registered under the name '{key}'.")sc
-#         BUILTIN_MODELS[key] = fn
-#         return fn
-
-#     return wrapper
-
-
-# @register_model
 def rana_sierrae_cnn(pretrained=True):
     """Load CNN that detects Rana sierrae vocalizations"""
 
