@@ -1,8 +1,13 @@
-"""load the pre-trained YamNET model for general audio embedding/classifier"""
+"""load the pre-trained YAMNet model for general audio embedding/classifier"""
 import numpy as np
 import csv
 import io
 import pandas as pd
+
+from opensoundscape.preprocess.preprocessors import AudioPreprocessor
+from opensoundscape.ml.dataloaders import SafeAudioDataloader
+from tqdm.autonotebook import tqdm
+from opensoundscape.ml.cnn import BaseClassifier
 
 
 def class_names_from_csv(class_map_csv_text):
@@ -15,36 +20,29 @@ def class_names_from_csv(class_map_csv_text):
     return class_names
 
 
-from opensoundscape.preprocess.preprocessors import AudioPreprocessor
-from opensoundscape.ml.dataloaders import SafeAudioDataloader
-from tqdm.autonotebook import tqdm
-from opensoundscape.ml.cnn import BaseClassifier
-
-
 class YAMNet(BaseClassifier):
     def __init__(self, url="https://tfhub.dev/google/yamnet/1", input_duration=60):
         """load TF model hub google Perch model, wrap in OpSo TensorFlowHubModel class
 
         Args:
-            url to model path (default is Perch v3)
+            url to model path (default is YAMNet v1)
             input_duration: (sec) this amount of audio in internally windowed into
                 0.96 sec clips with 0.48 sec overlap and batched for inference.
                 This implicitly determines the batch size.
 
         Returns:
-            object with .predict(), .embed() etc methods
-
+            object with .predict(), .generate_embeddings() etc methods
 
         Methods:
             predict (alias for generate_logits): get per-audio-clip per-class scores in dataframe format
             generate_embeddings: returns dataframe of embeddings (features from penultimate layer)
-            generate_logmelspecs: returns list of 2d logmelspec arrays
+            generate_logmelspecs: returns list of 2d log-valued mel spectrogram arrays
             generate_embeddings_and_logits: returns 2 dfs (embeddings, logits)
 
         Example:
         ```
         import torch
-        m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YamNET')
+        m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet')
         m.predict(['test.wav']) # returns dataframe of per-class scores
         m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
         ```
@@ -56,7 +54,7 @@ class YAMNet(BaseClassifier):
             import tensorflow_hub
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
-                "YamNET requires tensorflow and tensorflow_hub packages to be installed. "
+                "YAMNet requires tensorflow and tensorflow_hub packages to be installed. "
                 "Install in your python environment with `pip install tensorflow tensorflow_hub`"
             ) from exc
 
@@ -77,9 +75,9 @@ class YAMNet(BaseClassifier):
         self.classes = class_names
 
     def __call__(self, dataloader, **kwargs):
-        """kwargs are passed to SafeAudioDataloader init (num_workers, batch_size, etc)
+        """Run inference on a dataloader
 
-        returns logits, embeddings, logmelspec
+        returns logits, embeddings, logmelspec, start_times, files
 
         see https://tfhub.dev/google/yamnet/1 for details
 
@@ -92,7 +90,7 @@ class YAMNet(BaseClassifier):
         - discards incomplete frame at end (it seems)
         """
         if dataloader.batch_size > 1:
-            raise ValueError("batch size must be 1 for YamNET")
+            raise ValueError("batch size must be 1 for YAMNet")
 
         # iterate batches, running inference on each
         logits = []
@@ -102,7 +100,7 @@ class YAMNet(BaseClassifier):
         files = []
         for i, batch in enumerate(tqdm(dataloader)):
             waveform = batch[0].data.samples  # batch is always only one AudioSample
-            # 1d input is batched into windows/frames internally by YamNET
+            # 1d input is batched into windows/frames internally by YAMNet
             batch_logits, batch_embeddings, batch_logmelspec = self.network(waveform)
             logits.extend(batch_logits.numpy().tolist())
             embeddings.extend(batch_embeddings.numpy().tolist())
@@ -141,12 +139,12 @@ class YAMNet(BaseClassifier):
 
         Returns:
             pd.DataFrame of embedding vectors, wwith (file, start_time, end_time) as index
-            Note: more return values than inputs, since YamNET internally
+            Note: more return values than inputs, since YAMNet internally
             batches and windows the audio into 0.96 sec clips with 0.48 sec overlap
 
         """
         kwargs.update({"batch_size": 1})
-        # since YamNET internally batches and windows the audio, it makes sense to use partial
+        # since YAMNet internally batches and windows the audio, it makes sense to use partial
         # "remainder" mode even if we get less than sample_duration, eg 60 sec
         kwargs.update({"final_clip": "remainder"})
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
@@ -177,7 +175,7 @@ class YAMNet(BaseClassifier):
             m: number of frames per input (input_length // .48 or one less)
         """
         kwargs.update({"batch_size": 1})
-        # since YamNET internally batches and windows the audio, it makes sense to use partial
+        # since YAMNet internally batches and windows the audio, it makes sense to use partial
         # "remainder" mode even if we get less than sample_duration, eg 60 sec
         kwargs.update({"final_clip": "remainder"})
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
@@ -203,18 +201,18 @@ class YAMNet(BaseClassifier):
                 - a list (or np.ndarray) of audio file paths
             **kwargs: additional arguments to inference_dataloader_cls.__init__
 
-        Note: batch size is always 1 since YamNET internally batches and windows.
-            Use longer input_duration when initializing YamNet for larger batch size.
+        Note: batch size is always 1 since YAMNet internally batches and windows.
+            Use longer input_duration when initializing YAMNet for larger batch size.
 
         Returns:
             dataframe of per-class scores with one row per input frame
-            (0.96 sec long, 0.48 sec overlap between frames), since YamNET
+            (0.96 sec long, 0.48 sec overlap between frames), since YAMNet
             internally batches and windows the audio
 
             Note: returns more rows than inputs because of internal frame/windowing
         """
         kwargs.update({"batch_size": 1})
-        # since YamNET internally batches and windows the audio, it makes sense to use partial
+        # since YAMNet internally batches and windows the audio, it makes sense to use partial
         # "remainder" mode even if we get less than sample_duration, eg 60 sec
         kwargs.update({"final_clip": "remainder"})
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
@@ -249,7 +247,7 @@ class YAMNet(BaseClassifier):
         # avoids re-running inference if both outputs are desired
 
         kwargs.update({"batch_size": 1})
-        # since YamNET internally batches and windows the audio, it makes sense to use partial
+        # since YAMNet internally batches and windows the audio, it makes sense to use partial
         # "remainder" mode even if we get less than sample_duration, eg 60 sec
         kwargs.update({"final_clip": "remainder"})
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
