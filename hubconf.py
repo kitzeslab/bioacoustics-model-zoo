@@ -5,9 +5,6 @@ import torch
 from opensoundscape import CNN as _CNN
 
 # each function we import will be visible in torch.hub.list()
-from bioacoustics_model_zoo.google_bird_vocalization_classifier import (
-    google_bird_vocalization_classifier,
-)
 from bioacoustics_model_zoo.birdnet import birdnet
 from bioacoustics_model_zoo.mixit_separation import SeparationModel
 from bioacoustics_model_zoo.yamnet import yamnet

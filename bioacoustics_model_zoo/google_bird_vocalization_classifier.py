@@ -18,7 +18,7 @@ from bioacoustics_model_zoo.utils import (
 
 # TODO: update url to v3 when its no longer broken
 def google_bird_vocalization_classifier(
-    url="https://tfhub.dev/google/bird-vocalization-classifier/2",
+    url="https://tfhub.dev/google/bird-vocalization-classifier/4",
 ):
     return GoogleBirdVocalizationClassifier(url)
 
@@ -38,18 +38,17 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
         generate_embeddings_and_logits: returns (embeddings, logits)
     """
 
-    def __init__(self, url="https://tfhub.dev/google/bird-vocalization-classifier/2"):
+    def __init__(self, url="https://tfhub.dev/google/bird-vocalization-classifier/4"):
         """load TF model hub google Perch model, wrap in OpSo TensorFlowHubModel class
 
         Args:
-            url to model path (default is Perch v3)
+            url to model path (default is Perch v4)
 
         Returns:
             object with .predict(), .embed() etc methods
         """
         # only require tensorflow and tensorflow_hub if/when this class is used
         try:
-            import tensorflow
             import tensorflow_hub
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
@@ -70,15 +69,14 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
         label_csv = resources / "google-bird-vocalization-classifier_v3_classes.csv"
         self.classes = pd.read_csv(label_csv)["ebird2021"].values
 
-    def __call__(self, dataloader, **kwargs):
-        """kwargs are passed to SafeAudioDataloader init (num_workers, batch_size, etc)
+    def __call__(self, dataloader):
+        """run forward pass of model, iterating through dataloader batches
 
         returns logits, embeddings, start_times, files"""
 
         # iterate batches, running inference on each
         logits = []
         embeddings = []
-        logmelspec = []
         start_times = []
         files = []
         for batch in tqdm(dataloader):
@@ -92,6 +90,8 @@ class GoogleBirdVocalizationClassifier(BaseClassifier):
 
     def generate_embeddings(self, samples, **kwargs):
         """Generate embeddings for audio data
+
+        kwargs are passed to SafeAudioDataloader init (num_workers, batch_size, etc)
 
         Args:
             samples: any of the following:
