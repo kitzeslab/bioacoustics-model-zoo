@@ -37,6 +37,32 @@ class SeparationModel(object):
                 (returns np array [batch, num_sources, num_samples]])
             separate_audio: separates an opensoundscape.Audio object into sources
                 (returns list of Audio)
+
+        Example:
+
+        First, download the checkpoint and metagraph from the MixIt Github repo:
+        install gsutil and run the following command in your terminal:
+        `gsutil -m cp -r gs://gresearch/sound_separation/bird_mixit_model_checkpoints .`
+
+        Then, use the model in python:
+        ```
+        import torch
+        # provide the local path to the checkpoint when creating the object
+        model = torch.hub.load(
+            'kitzeslab/bioacoustics-model-zoo',
+            'SeparationModel',
+            checkpoint='/path/to/bird_mixit_model_checkpoints/output_sources4/model.ckpt-3223090'
+        ) #creates 4 channels; use output_sources8 to separate into 8 channels
+
+        # separate opensoundscape Audio object into 4 channels:
+        # note that it seems to work best on 5 second segments
+        a=Audio.from_file('audio.mp3',sample_rate=22050).trim(0,5)
+        separated = model.separate_audio(a)
+
+        # save audio files for each separated channel:
+        # saves audio files with extensions like _stem0.wav, _stem1.wav, etc
+        model.load_separate_write('./temp.wav')
+
         """
         # only require tensorflow if/when this class is used
         try:
