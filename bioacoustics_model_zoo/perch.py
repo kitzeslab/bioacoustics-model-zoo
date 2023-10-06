@@ -25,17 +25,26 @@ class Perch(BaseClassifier):
         object with .predict(), .generate_embeddings() etc methods
 
     Methods:
-        predict: get per-audio-clip per-class scores in dataframe format; includes WandB logging
-        generate_embeddings: make embeddings for audio data (feature vectors from penultimate layer)
-        generate_embeddings_and_logits: returns (embeddings, logits)
+        predict: get per-audio-clip per-class scores as pandas DataFrame
+        generate_logits: equivalent to predict()
+        generate_embeddings: make df of embeddings (feature vectors from penultimate layer)
+        generate_embeddings_and_logits: returns 2 dfs: (embeddings, logits)
 
-    Example:
+    Example 1: download from TFHub and generate logits and embeddings
     ```
     import torch
     model=torch.hub.load('kitzeslab/bioacoustics_model_zoo', 'Perch')
     predictions = model.predict(['test.wav']) #predict on the model's classes
     embeddings = model.generate_embeddings(['test.wav']) #generate embeddings on each 5 sec of audio
     ```
+
+    Example 2: loading from local folder
+    ```
+    m = torch.hub.load(
+        'kitzeslab/bioacoustics-model-zoo:google_bird_model',
+        'Perch',
+        url='/path/to/perch_0.1.2/',
+    )
     """
 
     def __init__(self, url="https://tfhub.dev/google/bird-vocalization-classifier/4"):
@@ -160,7 +169,7 @@ class Perch(BaseClassifier):
     predict = generate_logits
 
     def generate_embeddings_and_logits(self, samples, **kwargs):
-        """Return (logits, embeddings) for audio data
+        """Return (embeddings, logits) dataframes for audio data
 
         Args:
             samples: any of the following:
@@ -169,7 +178,7 @@ class Perch(BaseClassifier):
                 - Dataframe with file, start_time, end_time of clips as index
             **kwargs: any arguments to SafeAudioDataloader
 
-        returns 2 dataframes: (logits, embeddings)
+        returns 2 dataframes: (embeddings, logits)
         """
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
 
@@ -190,4 +199,4 @@ class Perch(BaseClassifier):
                 names=["file", "start_time", "end_time"],
             ),
         )
-        return logits_df, embeddings_df
+        return embeddings_df, logits_df
