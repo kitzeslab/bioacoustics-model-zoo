@@ -14,11 +14,6 @@ from bioacoustics_model_zoo.utils import (
 )
 
 
-def perch(model_dir):
-    """pass the path to the folder containing /savedmodel/saved_model.pb and /label.csv"""
-    return Perch(model_dir)
-
-
 class Perch(BaseClassifier):
     """load Perch from local folder
 

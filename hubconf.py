@@ -8,9 +8,9 @@ from opensoundscape import CNN as _CNN
 from bioacoustics_model_zoo.birdnet import birdnet
 from bioacoustics_model_zoo.mixit_separation import SeparationModel
 from bioacoustics_model_zoo.yamnet import yamnet
-from bioacoustics_model_zoo.perch import perch
+from bioacoustics_model_zoo.perch import Perch
 
-# do we need functions or can they be classes?
+# do we need functions or can they be classes? I think any "callable"
 
 ## see instructions here:
 ## https://pytorch.org/docs/stable/hub.html#torch.hub.load_state_dict_from_url
