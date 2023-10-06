@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
+import urllib
 
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
@@ -27,6 +28,14 @@ class Perch(BaseClassifier):
         predict: get per-audio-clip per-class scores in dataframe format; includes WandB logging
         generate_embeddings: make embeddings for audio data (feature vectors from penultimate layer)
         generate_embeddings_and_logits: returns (embeddings, logits)
+
+    Example:
+    ```
+    import torch
+    model=torch.hub.load('kitzeslab/bioacoustics_model_zoo', 'Perch')
+    predictions = model.predict(['test.wav']) #predict on the model's classes
+    embeddings = model.generate_embeddings(['test.wav']) #generate embeddings on each 5 sec of audio
+    ```
     """
 
     def __init__(self, url="https://tfhub.dev/google/bird-vocalization-classifier/4"):
@@ -51,15 +60,14 @@ class Perch(BaseClassifier):
                 "Install in your python environment with `pip install tensorflow tensorflow_hub`"
             ) from exc
 
-        # allow url from tfhub or local dir
-        import urllib
+        self.preprocessor = AudioPreprocessor(sample_duration=5, sample_rate=32000)
+        self.inference_dataloader_cls = SafeAudioDataloader
+        self.sample_duration = 5
 
+        # Load pre-trained model: handle url from tfhub or local dir
         if urllib.parse.urlparse(url).scheme in ("http", "https"):
             # its a url, load from tfhub
             self.network = tensorflow_hub.load(url)
-            self.preprocessor = AudioPreprocessor(sample_duration=5, sample_rate=32000)
-            self.inference_dataloader_cls = SafeAudioDataloader
-            self.sample_duration = 5
 
             # load class list
             label_csv = tensorflow_hub.resolve(url) + "/assets/label.csv"
@@ -67,7 +75,9 @@ class Perch(BaseClassifier):
         else:
             # must be a local directory containing /savedmodel/saved_model.pb and /label.csv
             assert Path(url).is_dir(), f"url {url} is not a directory or a URL"
+            # tf.saved_model.load looks for `saved_model.pb` file in the directory passed to it
             self.network = tf.saved_model.load(Path(url) / "savedmodel")
+            # load class list
             self.classes = pd.read_csv(Path(url) / "label.csv")["ebird2021"].values
 
     def __call__(self, dataloader):
