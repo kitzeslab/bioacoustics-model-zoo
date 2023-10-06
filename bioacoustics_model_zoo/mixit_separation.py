@@ -62,6 +62,7 @@ class SeparationModel(object):
         # save audio files for each separated channel:
         # saves audio files with extensions like _stem0.wav, _stem1.wav, etc
         model.load_separate_write('./temp.wav')
+        ```
 
         """
         # only require tensorflow if/when this class is used
