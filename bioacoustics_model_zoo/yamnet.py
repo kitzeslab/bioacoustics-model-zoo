@@ -21,38 +21,7 @@ from tqdm.autonotebook import tqdm
 from opensoundscape.ml.cnn import BaseClassifier
 
 
-def yamnet(
-    url="https://tfhub.dev/google/yamnet/1",
-    input_duration=60,
-):
-    return YamNET(url, input_duration)
-
-
-class YamNET(BaseClassifier):
-    """load TF model hub google Perch model, wrap in OpSo class
-
-    Args:
-        url to model path (default is Google-Bird-Vocalization-Classifier v3)
-
-    Returns:
-        object with .predict(), .embed() etc methods
-
-    Methods:
-        predict: get per-audio-clip per-class scores in dataframe format
-        generate_embeddings: make embeddings for audio data (feature vectors from penultimate layer)
-        generate_embeddings_df: returns dataframe of embeddings with file, start_time, end_time as index
-    """
-
-    # only require tensorflow and tensorflow_hub if/when this class is used
-    try:
-        import tensorflow as tf
-        import tensorflow_hub
-    except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError(
-            "YamNET requires tensorflow and tensorflow_hub packages to be installed. "
-            "Install in your python environment with `pip install tensorflow tensorflow_hub`"
-        ) from exc
-
+class YAMNet(BaseClassifier):
     def __init__(self, url="https://tfhub.dev/google/yamnet/1", input_duration=60):
         """load TF model hub google Perch model, wrap in OpSo TensorFlowHubModel class
 
@@ -64,7 +33,32 @@ class YamNET(BaseClassifier):
 
         Returns:
             object with .predict(), .embed() etc methods
+
+
+        Methods:
+            predict (alias for generate_logits): get per-audio-clip per-class scores in dataframe format
+            generate_embeddings: returns dataframe of embeddings (features from penultimate layer)
+            generate_logmelspecs: returns list of 2d logmelspec arrays
+            generate_embeddings_and_logits: returns 2 dfs (embeddings, logits)
+
+        Example:
+        ```
+        import torch
+        m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YamNET')
+        m.predict(['test.wav']) # returns dataframe of per-class scores
+        m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
+        ```
         """
+
+        # only require tensorflow and tensorflow_hub if/when this class is used
+        try:
+            import tensorflow as tf
+            import tensorflow_hub
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "YamNET requires tensorflow and tensorflow_hub packages to be installed. "
+                "Install in your python environment with `pip install tensorflow tensorflow_hub`"
+            ) from exc
 
         # Load the model.
         self.network = tensorflow_hub.load(url)
@@ -89,7 +83,7 @@ class YamNET(BaseClassifier):
 
         see https://tfhub.dev/google/yamnet/1 for details
 
-        ## Inputs to tfhub model:
+        ## Notes on inputs to this tfhub model:
         - audio waveform in [-1,1] sampled at 16 kHz, any duration
         - internally, windows into batches:
         sliding windows of length 0.96 seconds and hop 0.48 seconds
@@ -146,27 +140,10 @@ class YamNET(BaseClassifier):
             **kwargs: any arguments to SafeAudioDataloader
 
         Returns:
-            list of embeddings, shape [N, 1024]
-            Note: more return values than rows in input df, since YamNET internally
-            batches and windows the audio into 0.96 sec clips with 0.48 sec overlap
-        """
-        kwargs.update({"batch_size": 1})
-        # since YamNET internally batches and windows the audio, it makes sense to use partial
-        # "remainder" mode even if we get less than sample_duration, eg 60 sec
-        kwargs.update({"final_clip": "remainder"})
-        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        _, embeddings, _, _, _ = self(dataloader)
-        return embeddings
-
-    def generate_embeddings_df(self, samples, **kwargs):
-        """Generate embeddings for audio data
-
-        Args:
-            see self.generate_embeddings
-
-        Returns:
             pd.DataFrame of embedding vectors, wwith (file, start_time, end_time) as index
-            Note: returns more rows than inputs because of internal frame/windowing
+            Note: more return values than inputs, since YamNET internally
+            batches and windows the audio into 0.96 sec clips with 0.48 sec overlap
+
         """
         kwargs.update({"batch_size": 1})
         # since YamNET internally batches and windows the audio, it makes sense to use partial
@@ -181,31 +158,6 @@ class YamNET(BaseClassifier):
             ),
             data=embeddings,
         )
-
-    def generate_logits(self, samples, **kwargs):
-        """Return (logits, embeddings) for audio data
-
-        Args:
-            samples: any of the following:
-                - list of file paths
-                - Dataframe with file as index
-                - Dataframe with file, start_time, end_time of clips as index
-            **kwargs: any arguments to SafeAudioDataloader
-
-        Returns:
-            list of 512 output scores, one per class (check self.classes for class names)
-            (shape [N, 512])
-
-            Note: more return values than rows in input df, since YamNET internally
-            batches and windows the audio into 0.96 sec clips with 0.48 sec overlap
-        """
-        kwargs.update({"batch_size": 1})
-        # since YamNET internally batches and windows the audio, it makes sense to use partial
-        # "remainder" mode even if we get less than sample_duration, eg 60 sec
-        kwargs.update({"final_clip": "remainder"})
-        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        logits, _, _, _, _ = self(dataloader)
-        return logits
 
     def generate_logmelspecs(self, samples, **kwargs):
         """Return 2d logmelspec arrays for audio data
@@ -232,7 +184,7 @@ class YamNET(BaseClassifier):
         _, _, logmelspecs, _, _ = self(dataloader)
         return logmelspecs
 
-    def predict(
+    def generate_logits(
         self,
         samples,
         **kwargs,
@@ -275,3 +227,49 @@ class YamNET(BaseClassifier):
             data=scores,
             columns=self.classes,
         )
+
+    predict = generate_logits  # alias
+
+    def generate_embeddings_and_logits(self, samples, **kwargs):
+        """returns 2 dfs (embeddings, logits) - see generate_logits and generate_embeddings
+
+        Only runs inference once, so faster than calling both methods separately.
+
+        Args:
+            samples: any of the following:
+                - list of file paths
+                - Dataframe with file as index
+                - Dataframe with file, start_time, end_time of clips as index
+            **kwargs: any arguments to SafeAudioDataloader
+
+        Returns:
+            (embeddings, logits) dataframes
+        """
+        # borrows from generate_logits and generate_embeddings code
+        # avoids re-running inference if both outputs are desired
+
+        kwargs.update({"batch_size": 1})
+        # since YamNET internally batches and windows the audio, it makes sense to use partial
+        # "remainder" mode even if we get less than sample_duration, eg 60 sec
+        kwargs.update({"final_clip": "remainder"})
+        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
+        scores, embeddings, _, start_times, files = self(dataloader)
+
+        embedding_df = pd.DataFrame(
+            index=pd.MultiIndex.from_arrays(
+                [files, start_times, np.array(start_times) + 0.96],
+                names=["file", "start_time", "end_time"],
+            ),
+            data=embeddings,
+        )
+
+        score_df = pd.DataFrame(
+            index=pd.MultiIndex.from_arrays(
+                [files, start_times, np.array(start_times) + 0.96],
+                names=["file", "start_time", "end_time"],
+            ),
+            data=scores,
+            columns=self.classes,
+        )
+
+        return embedding_df, score_df

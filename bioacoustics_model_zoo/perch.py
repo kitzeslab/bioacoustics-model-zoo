@@ -16,7 +16,20 @@ from bioacoustics_model_zoo.utils import (
 
 
 class Perch(BaseClassifier):
-    """load Perch from local folder
+    """load Perch (aka Google Bird Vocalization Classifier) from TensorFlow Hub or local file
+
+    [Perch](https://tfhub.dev/google/bird-vocalization-classifier/4) is shared under the
+    [Apache 2.0 License](https://opensource.org/license/apache-2-0/).
+
+    The model can be used to classify bird vocalizations from about 10,000 bird species, or
+    to generate feature embeddings for audio files. It was trained on recordings from Xeno Canto.
+
+    Model performance is described in :
+    ```
+    Ghani, Burooj, et al.
+    "Feature embeddings from large-scale acoustic bird classifiers enable few-shot transfer learning."
+    arXiv preprint arXiv:2307.06292 (2023).
+    ```
 
     Args:
         model_dir: path to local folder containing /savedmodel/saved_model.pb and /label.csv

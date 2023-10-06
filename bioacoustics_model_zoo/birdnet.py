@@ -15,45 +15,52 @@ from bioacoustics_model_zoo.utils import (
     download_github_file,
 )
 
-# Birdnet Analyzer provides good api: https://github.com/kahst/BirdNET-Analyzer/blob/main/model.py
 
-
-def birdnet(
-    checkpoint_url="https://github.com/kahst/BirdNET-Analyzer/blob/main/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP16.tflite",
-    label_url="https://github.com/kahst/BirdNET-Analyzer/blob/main/labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt",
-):
-    return BirdNetTFLite(checkpoint_url, label_url)
-
-
-class BirdNetTFLite(BaseClassifier):
-    """load BirdNET model from .tflite file (does url work?)
-
-    Args:
-        url to model path (default is v2.4 FP16)
-
-    Returns:
-        opensoundscape.TensorFlowHubModel object with .predict() method for inference
-
-    Methods:
-        predict: get per-audio-clip per-class scores in dataframe format; includes WandB logging
-        generate_embeddings: make embeddings for audio data (feature vectors from penultimate layer)
-        generate_embeddings_and_logits: returns (embeddings, logits)
-    """
-
+class BirdNET(BaseClassifier):
     def __init__(
         self,
         checkpoint_url="https://github.com/kahst/BirdNET-Analyzer/raw/main/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP16.tflite",
         label_url="https://github.com/kahst/BirdNET-Analyzer/blob/main/labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt",
         num_tflite_threads=1,
     ):
-        """load model, wrap in OpSo class
+        """load BirdNET model from .tflite file on GitHub
+
+        [BirdNET](https://github.com/kahst/BirdNET-Analyzer) is shared under the CC A-NC-SA 4.0.
+        Suggested Citation:
+        @article{kahl2021birdnet,
+            title={BirdNET: A deep learning solution for avian diversity monitoring},
+            author={Kahl, Stefan and Wood, Connor M and Eibl, Maximilian and Klinck, Holger},
+            journal={Ecological Informatics},
+            volume={61},
+            pages={101236},
+            year={2021},
+            publisher={Elsevier}
+        }
+
+        BirdNET Analyzer provides good api: https://github.com/kahst/BirdNET-Analyzer/blob/main/model.py
+        This wrapper may be useful for those already using OpenSoundscape and looking for a consistent API
 
         Args:
             url: url to .tflite checkpoint on GitHub, or a local path to the .tflite file
             label_url: url to .txt file with class labels, or a local path to the .txt file
 
         Returns:
-            object with .predict() method for inference
+            model object with methods for generating predictions and embeddings
+
+        Methods:
+            predict: get per-audio-clip per-class scores in dataframe format; includes WandB logging
+                (inherited from BaseClassifier)
+            generate_embeddings: make embeddings for audio data (feature vectors from penultimate layer)
+            generate_embeddings_and_logits: returns (embeddings, logits)
+
+
+        Example:
+        ```
+        import torch
+        m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET')
+        m.predict(['test.wav']) # returns dataframe of per-class scores
+        m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
+        ```
         """
         # only require tensorflow if/when this class is used
         try:
@@ -141,23 +148,15 @@ class BirdNetTFLite(BaseClassifier):
             list of embeddings
         """
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        return self(dataloader, return_embeddings=True, return_logits=False)
-
-    def generate_logits(self, samples, **kwargs):
-        """Return (logits, embeddings) for audio data
-
-        Args:
-            samples: any of the following:
-                - list of file paths
-                - Dataframe with file as index
-                - Dataframe with file, start_time, end_time of clips as index
-            **kwargs: any arguments to SafeAudioDataloader
-        """
-        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        return self(dataloader, return_embeddings=False, return_logits=True)
+        df_index = dataloader.dataset.dataset.label_df.index
+        embeddings = self(dataloader, return_embeddings=True, return_logits=False)
+        return pd.DataFrame(index=df_index, data=embeddings, columns=self.classes)
 
     def generate_embeddings_and_logits(self, samples, **kwargs):
-        """Return (logits, embeddings) for audio data
+        """Return (logits, embeddings) dataframes for audio data
+
+        avoids running inference twice, so faster than calling
+        generate_embeddings and generate_logits separately
 
         Args:
             samples: any of the following:
@@ -167,4 +166,11 @@ class BirdNetTFLite(BaseClassifier):
             **kwargs: any arguments to SafeAudioDataloader
         """
         dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        return self(dataloader, return_embeddings=True, return_logits=True)
+        embeddings, logits = self(
+            dataloader, return_embeddings=True, return_logits=True
+        )
+        df_index = dataloader.dataset.dataset.label_df.index
+        return (
+            pd.DataFrame(index=df_index, data=embeddings, columns=self.classes),
+            pd.DataFrame(index=df_index, data=logits, columns=self.classes),
+        )
