@@ -144,11 +144,13 @@ OpenSoundscape the module is named `signal` rather than `signal_processing`)
 ## Troubleshooting 
 
 ### Tensorflow Installation in Python Environment
-Installing TensorFlow can be tricky, and it may not be possible to have cuda-enabled tensorflow in the same environment as pytorch. In this case, you can install a cpu-only version of tensorflow (`pip install tensorflow-cpu`). You may want to start with a fresh environment, or uninstall tensorflow and nvidia-cudnn-cu11 then reinstall pytorch with the appropriate nvidia-cudnn-cu11, to avoid having the wrong cudnn for PyTorch. 
+Installing TensorFlow can be tricky, and it may not be possible to have cuda-enabled tensorflow in the same environment as cuda-enabled pytorch. In this case, you can install a cpu-only version of tensorflow (`pip install tensorflow-cpu`). You may want to start with a fresh environment, or uninstall tensorflow and nvidia-cudnn-cu11 then reinstall pytorch with the appropriate nvidia-cudnn-cu11, to avoid having the wrong cudnn for PyTorch. 
+
+Alternatively, if you want to use the TensorFlow Hub models with GPU acceleration, create an environment where you uninstall `pytorch` and `nvidia-cudnn-cu11` and install a cpu-only version (see [this page](https://pytorch.org/get-started/locally/) for the correct installation command). Then, you can `pip install tensorflow-hub` and let it choose the correct nvidia-cudnn so that it can use CUDA and leverage GPU acceleration. 
 
 Installing tensorflow: Carefully follow the [directions](https://www.tensorflow.org/install/pip) for your system. Note that models provided in this repo might require the specific nvidia-cudnn-cu11 version 8.6.0, which could conflict with the version required for pytorch. 
 
-### Downloading TF Hub Models
+### Error while Downloading TF Hub Models
 
 Some of the models provided in this repo are hosted on the Tensorflow model hub. 
 
@@ -158,7 +160,7 @@ If you encounter the following error (or similar) when downloading a TensorFlow 
 ValueError: Trying to load a model of incompatible/unknown type. '/var/folders/d8/265wdp1n0bn_r85dh3pp95fh0000gq/T/tfhub_modules/9616fd04ec2360621642ef9455b84f4b668e219e' contains neither 'saved_model.pb' nor 'saved_model.pbtxt'.
 ```
 
-You need to delete the listed folder. Then loading the model should work. 
+You need to delete the folder listed in the error message (something like `/var/folders/...tfhub_modules/....`). After deleting that folder, downloading the model should work. 
 
 The issue occurs because TensorFlow Hub is looking for a cached 
 model in a temporary folder where it was once stored but no longer exists. See relevant GitHub issue here: 
