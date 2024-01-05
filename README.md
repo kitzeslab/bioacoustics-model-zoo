@@ -38,9 +38,9 @@ Example:
 
 ```python
 import torch
-model=torch.hub.load('kitzeslab/bioacoustics_model_zoo', 'Perch')
-predictions = model.predict(['test.wav']) #predict on the model's classes
-embeddings = model.generate_embeddings(['test.wav']) #generate embeddings on each 5 sec of audio
+model=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'Perch')
+predictions = model.predict(['test.wav']) # predict on the model's classes
+embeddings = model.generate_embeddings(['test.wav']) # generate embeddings on each 5 sec of audio
 ```
 
 ### [BirdNET](https://github.com/kahst/BirdNET-Analyzer)
