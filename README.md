@@ -5,7 +5,7 @@ Pre-trained models for bioacoustic classification tasks
 
 ### List: 
 
-list available models in the GitHub repo [bioacoustics-model-zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/)
+List available models in the GitHub repo [bioacoustics-model-zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/)
 ```
 import torch
 torch.hub.list('kitzeslab/bioacoustics-model-zoo')
@@ -117,7 +117,7 @@ m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'rana_sierrae_cnn')
 m.predict(['test.wav']) # returns dataframe of per-class scores
 ```
 
-## Other automated detection tools for Bioacoustics
+## Other automated detection tools for bioacoustics
 
 ### RIBBIT 
 
