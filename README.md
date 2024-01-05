@@ -4,6 +4,7 @@ Pre-trained models for bioacoustic classification tasks
 # Basic usage
 
 ### List: 
+
 list available models in the GitHub repo [bioacoustics-model-zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/)
 ```
 import torch
@@ -11,6 +12,7 @@ torch.hub.list('kitzeslab/bioacoustics-model-zoo')
 ```
 
 ### Load: 
+
 Get a ready-to-use model object: choose from the models listed in the previous command
 ```
 model = torch.hub.load('kitzeslab/bioacoustics-model-zoo','rana_sierrae_cnn')
@@ -38,7 +40,7 @@ Example:
 
 ```python
 import torch
-model=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'Perch')
+model = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'Perch')
 predictions = model.predict(['test.wav']) # predict on the model's classes
 embeddings = model.generate_embeddings(['test.wav']) # generate embeddings on each 5 sec of audio
 ```
@@ -51,7 +53,7 @@ Example:
 
 ```python
 import torch
-m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET')
+m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET')
 m.predict(['test.wav']) # returns dataframe of per-class scores
 m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
 ```
@@ -78,11 +80,11 @@ model = torch.hub.load(
     'kitzeslab/bioacoustics-model-zoo',
     'SeparationModel',
     checkpoint='/path/to/bird_mixit_model_checkpoints/output_sources4/model.ckpt-3223090'
-) #creates 4 channels; use output_sources8 to separate into 8 channels
+) # creates 4 channels; use output_sources8 to separate into 8 channels
 
 # separate opensoundscape Audio object into 4 channels:
 # note that it seems to work best on 5 second segments
-a=Audio.from_file('audio.mp3',sample_rate=22050).trim(0,5)
+a = Audio.from_file('audio.mp3',sample_rate=22050).trim(0,5)
 separated = model.separate_audio(a)
 
 # save audio files for each separated channel:
@@ -91,25 +93,27 @@ model.load_separate_write('./temp.wav')
 ```
 
 ### [YAMNet](https://tfhub.dev/google/yamnet/1): 
+
 Embedding model trained on AudioSet YouTube
 
 Example:
 
 ```python
 import torch
-m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet')
+m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet')
 m.predict(['test.wav']) # returns dataframe of per-class scores
 m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
 ```
 
 
 ### rana_sierrae_cnn: 
+
 Detect underwater vocalizations of _Rana sierrae_, the Sierra Nevada Yellow-legged Frog
 
 example: 
 ```python
 import torch
-m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'rana_sierrae_cnn')
+m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'rana_sierrae_cnn')
 m.predict(['test.wav']) # returns dataframe of per-class scores
 ```
 
@@ -126,9 +130,9 @@ Implemented in [OpenSoundscape](https://opensoundscape.org) as
 - [Implementation for R](https://github.com/kitzeslab/r-ribbit)
 - [Manuscript: Lapp et al 2021](https://conbio.onlinelibrary.wiley.com/doi/full/10.1111/cobi.13718)
 
-### Accellerating and decellerating sequences
+### Accelerating and decelerating sequences
 
-Detect pulse trains that accellerate, such as the drumming of Ruffed Grouse (_Bonasa umbellus_)
+Detect pulse trains that accelerate, such as the drumming of Ruffed Grouse (_Bonasa umbellus_)
 
 Implemented in [OpenSoundscape](https://opensoundscape.org) as
 
@@ -143,7 +147,8 @@ OpenSoundscape the module is named `signal` rather than `signal_processing`)
 
 ## Troubleshooting 
 
-### Tensorflow Installation in Python Environment
+### TensorFlow Installation in Python Environment
+
 Installing TensorFlow can be tricky, and it may not be possible to have cuda-enabled tensorflow in the same environment as cuda-enabled pytorch. In this case, you can install a cpu-only version of tensorflow (`pip install tensorflow-cpu`). You may want to start with a fresh environment, or uninstall tensorflow and nvidia-cudnn-cu11 then reinstall pytorch with the appropriate nvidia-cudnn-cu11, to avoid having the wrong cudnn for PyTorch. 
 
 Alternatively, if you want to use the TensorFlow Hub models with GPU acceleration, create an environment where you uninstall `pytorch` and `nvidia-cudnn-cu11` and install a cpu-only version (see [this page](https://pytorch.org/get-started/locally/) for the correct installation command). Then, you can `pip install tensorflow-hub` and let it choose the correct nvidia-cudnn so that it can use CUDA and leverage GPU acceleration. 
