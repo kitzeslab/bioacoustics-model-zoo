@@ -28,6 +28,19 @@ scores = model.predict([audio_file_path],activation_layer='softmax')
 scores
 ```
 
+# Contributing
+
+To contribute a model to the model zoo:
+- fork this repository ([help](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo))
+- add a .py module in the bioacoustics_model_zoo subfolder implementing a class that instantiates your model object
+  - your trained model object or weights will not be saved in this repository. The class should instead load the pre-trained weights from a public url. For an example:
+https://github.com/kitzeslab/bioacoustics-model-zoo/blob/593fe39a9e0f712c04d6e20262af70aeac20be75/hubconf.py#L53-L57
+  - include a thorough docstring describing the model's purpose, how it was trained, and how to use it
+  - in the docstring, also include a suggested citation for others using the model
+- add a line to `hubconf.py` importing your class, eg `from bioacoustics_model_zoo.birdnet import BirdNET`
+- add your model to the Model List below in this document, with example usage
+- submit a pull request ([GitHub's help page](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork))
+
 # Model list
 
 ### [Perch](https://tfhub.dev/google/bird-vocalization-classifier/4): 
