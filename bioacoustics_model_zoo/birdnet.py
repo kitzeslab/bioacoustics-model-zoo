@@ -8,6 +8,7 @@ from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
 from opensoundscape.ml.cnn import BaseClassifier
+from opensoundscape import Audio, Action
 
 from bioacoustics_model_zoo.utils import (
     collate_to_np_array,
@@ -100,6 +101,11 @@ class BirdNET(BaseClassifier):
 
         # initialize preprocessor and choose dataloader class
         self.preprocessor = AudioPreprocessor(sample_duration=3, sample_rate=48000)
+        # extend short samples to 3s by padding end with zeros (silence)
+        self.preprocessor.insert_action(
+            action_index="extend",
+            action=Action(Audio.extend_to, is_augmentation=False, duration=3),
+        )
         self.inference_dataloader_cls = AudioSampleArrayDataloader
 
     def __call__(

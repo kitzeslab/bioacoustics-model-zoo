@@ -8,7 +8,7 @@ from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
 from opensoundscape.ml.cnn import BaseClassifier
-
+from opensoundscape import Action, Audio
 
 from bioacoustics_model_zoo.utils import (
     collate_to_np_array,
@@ -84,8 +84,15 @@ class Perch(BaseClassifier):
             ) from exc
 
         self.preprocessor = AudioPreprocessor(sample_duration=5, sample_rate=32000)
-        self.inference_dataloader_cls = SafeAudioDataloader
         self.sample_duration = 5
+        # extend short samples to 5s by padding end with zeros (silence)
+        self.preprocessor.insert_action(
+            action_index="extend",
+            action=Action(
+                Audio.extend_to, is_augmentation=False, duration=self.sample_duration
+            ),
+        )
+        self.inference_dataloader_cls = SafeAudioDataloader
 
         # Load pre-trained model: handle url from tfhub or local dir
         if urllib.parse.urlparse(url).scheme in ("http", "https"):
