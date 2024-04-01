@@ -145,7 +145,7 @@ class SeparationModel(object):
         # resample to 22050 and make the 3-d np array that the TF model expects
         waveform = audio.resample(22050).samples[np.newaxis, np.newaxis, :]
         separated = self.separate_waveform(waveform)  # [num_sources, num_samples]
-        return [Audio(s, sample_rate=audio.sample_rate) for s in separated]
+        return [Audio(s, sample_rate=22050) for s in separated]
 
     def load_separate_write(
         self,
