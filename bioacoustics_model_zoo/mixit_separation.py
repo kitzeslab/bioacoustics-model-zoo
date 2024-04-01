@@ -51,7 +51,8 @@ class SeparationModel(object):
         model = torch.hub.load(
             'kitzeslab/bioacoustics-model-zoo',
             'SeparationModel',
-            checkpoint='/path/to/bird_mixit_model_checkpoints/output_sources4/model.ckpt-3223090'
+            checkpoint='/path/to/bird_mixit_model_checkpoints/output_sources4/model.ckpt-3223090',
+            trust_repo=True
         ) #creates 4 channels; use output_sources8 to separate into 8 channels
 
         # separate opensoundscape Audio object into 4 channels:

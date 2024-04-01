@@ -15,7 +15,7 @@ torch.hub.list('kitzeslab/bioacoustics-model-zoo')
 
 Get a ready-to-use model object: choose from the models listed in the previous command
 ```
-model = torch.hub.load('kitzeslab/bioacoustics-model-zoo','rana_sierrae_cnn')
+model = torch.hub.load('kitzeslab/bioacoustics-model-zoo','rana_sierrae_cnn',trust_repo=True)
 ```
 
 ### Inference:
@@ -55,7 +55,7 @@ Example:
 
 ```python
 import torch
-model = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'Perch')
+model = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'Perch',trust_repo=True)
 predictions = model.predict(['test.wav']) # predict on the model's classes
 embeddings = model.generate_embeddings(['test.wav']) # generate embeddings on each 5 sec of audio
 ```
@@ -68,7 +68,7 @@ Example:
 
 ```python
 import torch
-m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET')
+m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET',trust_repo=True)
 m.predict(['test.wav']) # returns dataframe of per-class scores
 m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
 ```
@@ -94,7 +94,8 @@ import torch
 model = torch.hub.load(
     'kitzeslab/bioacoustics-model-zoo',
     'SeparationModel',
-    checkpoint='/path/to/bird_mixit_model_checkpoints/output_sources4/model.ckpt-3223090'
+    checkpoint='/path/to/bird_mixit_model_checkpoints/output_sources4/model.ckpt-3223090',
+    trust_repo=True,
 ) # creates 4 channels; use output_sources8 to separate into 8 channels
 
 # separate opensoundscape Audio object into 4 channels:
@@ -115,7 +116,7 @@ Example:
 
 ```python
 import torch
-m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet')
+m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet',trust_repo=True)
 m.predict(['test.wav']) # returns dataframe of per-class scores
 m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
 ```
@@ -128,7 +129,7 @@ Detect underwater vocalizations of _Rana sierrae_, the Sierra Nevada Yellow-legg
 example: 
 ```python
 import torch
-m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'rana_sierrae_cnn')
+m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'rana_sierrae_cnn',trust_repo=True)
 m.predict(['test.wav']) # returns dataframe of per-class scores
 ```
 

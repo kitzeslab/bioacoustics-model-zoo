@@ -57,7 +57,7 @@ class BirdNET(BaseClassifier):
         Example:
         ```
         import torch
-        m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET')
+        m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET',trust_repo=True)
         m.predict(['test.wav']) # returns dataframe of per-class scores
         m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
         ```

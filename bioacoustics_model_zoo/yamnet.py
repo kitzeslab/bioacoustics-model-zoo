@@ -1,4 +1,5 @@
 """load the pre-trained YAMNet model for general audio embedding/classifier"""
+
 import numpy as np
 import csv
 import io
@@ -42,7 +43,7 @@ class YAMNet(BaseClassifier):
         Example:
         ```
         import torch
-        m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet')
+        m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet',trust_repo=True)
         m.predict(['test.wav']) # returns dataframe of per-class scores
         m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
         ```

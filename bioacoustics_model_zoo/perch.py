@@ -46,7 +46,7 @@ class Perch(BaseClassifier):
     Example 1: download from TFHub and generate logits and embeddings
     ```
     import torch
-    model=torch.hub.load('kitzeslab/bioacoustics_model_zoo', 'Perch')
+    model=torch.hub.load('kitzeslab/bioacoustics_model_zoo', 'Perch',trust_repo=True)
     predictions = model.predict(['test.wav']) #predict on the model's classes
     embeddings = model.generate_embeddings(['test.wav']) #generate embeddings on each 5 sec of audio
     ```
@@ -57,6 +57,7 @@ class Perch(BaseClassifier):
         'kitzeslab/bioacoustics-model-zoo:google_bird_model',
         'Perch',
         url='/path/to/perch_0.1.2/',
+        trust_repo=True
     )
     """
 
