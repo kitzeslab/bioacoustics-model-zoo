@@ -9,6 +9,7 @@ from bioacoustics_model_zoo.birdnet import BirdNET
 from bioacoustics_model_zoo.mixit_separation import SeparationModel
 from bioacoustics_model_zoo.yamnet import YAMNet
 from bioacoustics_model_zoo.perch import Perch
+from bioacoustics_model_zoo.hawkears.hawkears import HawkEars
 
 # do we need functions or can they be classes? I think any "callable"
 

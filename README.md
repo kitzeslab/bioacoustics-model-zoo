@@ -73,6 +73,17 @@ m.predict(['test.wav']) # returns dataframe of per-class scores
 m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
 ```
 
+### [HawkEars](https://github.com/jhuus/HawkEars)
+
+Bird classification CNN for 314 North American species
+
+Example: 
+```python
+import torch
+m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'HawkEars',trust_repo=True)
+m.predict(['test.wav']) # returns dataframe of per-class scores
+```
+
 ### [MixIT Bird SeparationModel](https://github.com/google-research/sound-separation/blob/master/models/bird_mixit/README.md)
 
 Separate audio into channels potentially representing separate sources.

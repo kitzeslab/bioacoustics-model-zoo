@@ -5,3 +5,4 @@ tensorflow_hub
 tensorflow
 tqdm
 opensoundscape
+timm
