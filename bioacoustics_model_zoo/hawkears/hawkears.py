@@ -3,10 +3,10 @@ from opensoundscape.ml.cnn import BaseClassifier
 import pandas as pd
 import cv2
 
-import hawkears_base_config
-
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.preprocess.actions import Action, BaseAction
+
+from bioacoustics_model_zoo.hawkears import hawkears_base_config
 
 # Define custom EfficientNet_v2 configurations.
 
