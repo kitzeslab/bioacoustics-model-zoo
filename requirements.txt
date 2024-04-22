@@ -6,3 +6,4 @@ tensorflow
 tqdm
 opensoundscape
 timm
+torchaudio
