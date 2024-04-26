@@ -59,7 +59,7 @@ class BirdNET(BaseClassifier):
         ```
         import torch
         m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET',trust_repo=True)
-        m.predict(['test.wav']) # returns dataframe of per-class scores
+        m.predict(['test.wav'],batch_size=64) # returns dataframe of per-class scores
         m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
         ```
         """
