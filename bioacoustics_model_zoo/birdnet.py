@@ -117,21 +117,29 @@ class BirdNET(BaseClassifier):
             raise ValueError("Both return_logits and return_embeddings cannot be False")
 
         input_details = self.network.get_input_details()[0]
+        input_layer_idx = input_details["index"]
         output_details = self.network.get_output_details()[0]
+        embedding_idx = output_details["index"] - 1
+        print(input_details, output_details)
+
+        # choose which layer should be used for embeddings
         embedding_idx = output_details["index"] - 1
 
         # iterate batches, running inference on each
         logits = []
         embeddings = []
         for batch in tqdm(dataloader):
-            for audio in batch:  # no batching, one by one?
-                # using chirp repo code here:
-                self.network.set_tensor(
-                    input_details["index"], np.float32(audio)[np.newaxis, :]
-                )
-                self.network.invoke()
-                logits.extend(self.network.get_tensor(output_details["index"]))
-                embeddings.extend(self.network.get_tensor(embedding_idx))
+            # we need to reshape the format of expected input tensor for TF model to include batch dimension
+            # doing it inside the loop since its fast and final batch might be smaller
+            self.network.resize_tensor_input(
+                input_layer_idx, [len(batch), *batch[0].shape]
+            )
+            self.network.allocate_tensors()  # memory allocation?
+            # send data to model
+            self.network.set_tensor(input_details["index"], np.float32(batch))
+            self.network.invoke()  # forward pass
+            logits.extend(self.network.get_tensor(output_details["index"]))
+            embeddings.extend(self.network.get_tensor(embedding_idx))
 
         if return_logits and return_embeddings:
             return embeddings, logits
