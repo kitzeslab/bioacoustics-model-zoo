@@ -193,6 +193,8 @@ OpenSoundscape the module is named `signal` rather than `signal_processing`)
 
 ### TensorFlow Installation in Python Environment
 
+Some models in the model zoo require tensorflow (and potentially tensorflow_hub) to be installed in your python environment. 
+
 Installing TensorFlow can be tricky, and it may not be possible to have cuda-enabled tensorflow in the same environment as cuda-enabled pytorch. In this case, you can install a cpu-only version of tensorflow (`pip install tensorflow-cpu`). You may want to start with a fresh environment, or uninstall tensorflow and nvidia-cudnn-cu11 then reinstall pytorch with the appropriate nvidia-cudnn-cu11, to avoid having the wrong cudnn for PyTorch. 
 
 Alternatively, if you want to use the TensorFlow Hub models with GPU acceleration, create an environment where you uninstall `pytorch` and `nvidia-cudnn-cu11` and install a cpu-only version (see [this page](https://pytorch.org/get-started/locally/) for the correct installation command). Then, you can `pip install tensorflow-hub` and let it choose the correct nvidia-cudnn so that it can use CUDA and leverage GPU acceleration. 
