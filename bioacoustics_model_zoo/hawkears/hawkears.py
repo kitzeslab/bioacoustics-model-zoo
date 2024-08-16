@@ -209,7 +209,7 @@ class HawkEars(CNN):
         # use 3s duration and expected sample shape for HawkEars
         super(HawkEars, self).__init__(
             arch,
-            classes=classes["Common Name"],
+            classes=classes["Common Name"].values,
             sample_duration=3,
             sample_shape=[192, 384, 1],
         )
@@ -228,3 +228,6 @@ class HawkEars(CNN):
         # but mps does not support spectrogram creation as of April 2024
         pre.insert_action(action_index="to_spec", action=HawkEarsSpec(cfg=config))
         self.preprocessor = pre
+
+        # specify a default layer for GradCAM visualization
+        self.network.cam_target_layers = self.network.blocks[-1]
