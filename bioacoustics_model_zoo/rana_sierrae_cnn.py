@@ -13,6 +13,7 @@ def rana_sierrae_cnn(pretrained=True):
         classes=["rana_sierrae", "negative"],
         sample_duration=2.0,
         single_target=True,
+        channels=3,
     )
 
     ## Preprocessing Parameters ##

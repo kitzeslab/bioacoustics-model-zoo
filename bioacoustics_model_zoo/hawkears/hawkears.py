@@ -1,10 +1,12 @@
-from opensoundscape import Audio, CNN
-from opensoundscape.ml.cnn import BaseClassifier
+import warnings
 import pandas as pd
 import cv2
 
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.preprocess.actions import Action, BaseAction
+import opensoundscape
+from opensoundscape import Audio, CNN
+from opensoundscape.ml.cnn import BaseClassifier
 
 from bioacoustics_model_zoo.hawkears import hawkears_base_config
 
@@ -45,13 +47,19 @@ def build_efficientnet_architecture(model_name, **kwargs):
     else:
         raise Exception(f"Unknown custom EfficientNetV2 model name: {model_name}")
 
-    return efficientnet._gen_efficientnetv2_s(
+    arch = efficientnet._gen_efficientnetv2_s(
         "efficientnetv2_rw_t",
         channel_multiplier=channel_multiplier,
         depth_multiplier=depth_multiplier,
         in_chans=1,
         **kwargs,
     )
+
+    arch.classifier_layer = "classifier"
+    arch.embedding_layer = "global_pool"
+    arch.cam_layer = "conv_head"
+
+    return arch
 
 
 import torchaudio
@@ -145,7 +153,7 @@ class HawkEarsSpec(BaseAction):
 
         return spec
 
-    def go(self, sample):
+    def __call__(self, sample):
         """creates spectrogram, normalizes, casts to torch.tensor"""
         # sample.data will be Audio object. Replace sample.data with torch.tensor of spectrogram.
         spec = self._get_raw_spectrogram(sample.data.samples)
@@ -170,40 +178,46 @@ class HawkEars(CNN):
         checkpoint_url: URL or local file path to model checkpoint. Default is recommended.
             Note that some values in this class (such as the architecture) are hard coded to match
             the parameters of the default checkpoint model.
+            if None, architecture is initialized with random weights
 
     Usage: use .predict([audio1.wav,audio2.wav]) to generate class predictions on audio files. See OpenSoundscape.CNN for details.
     """
-
-    ##TODO: implement embed (maybe in CNN rather than here)
 
     def __init__(
         self,
         config=None,
         checkpoint_url="https://github.com/jhuus/HawkEars/blob/24bc5a3e031866bc3ff81343bffff83429ee7897/data/ckpt/custom_efficientnet_5B.ckpt",
     ):
-        # download the necessary files:
-        # download model if URL, otherwise find it at local path:
-        if checkpoint_url.startswith("http"):
-            print("downloading model from URL...")
-            model_path = download_github_file(checkpoint_url)
+        # use weights from file, or random weights if checkpoint_url is None
+        if checkpoint_url is None:
+            model_path = None
         else:
-            model_path = checkpoint_url
-        model_path = str(Path(model_path).resolve())  # get absolute path as string
-        assert Path(model_path).exists(), f"Model path {model_path} does not exist"
+            # download model if URL, otherwise find it at local path:
+            if checkpoint_url.startswith("http"):
+                print("downloading model from URL...")
+                model_path = download_github_file(checkpoint_url)
+            else:
+                model_path = checkpoint_url
+            model_path = str(Path(model_path).resolve())  # get absolute path as string
+            assert Path(model_path).exists(), f"Model path {model_path} does not exist"
 
         # load list of classes
         class_list_path = Path(__file__).with_name("classes_edited.txt")
         classes = pd.read_csv(class_list_path)  # two columns: common, alpha
 
         # this checkpoint was trained on 314 classes
+        # initialize the architecture of the correct shape
         arch = build_efficientnet_architecture("5", num_classes=314)
-        model_dict = torch.load(model_path, map_location="cpu")
 
-        # remove 'base_model' prefix from state dict keys to match our architecture
-        state_dict = {
-            k.replace("base_model.", ""): v for k, v in model_dict["state_dict"].items()
-        }
-        arch.load_state_dict(state_dict)
+        # load the weights from checkpoint file
+        if model_path is not None:
+            model_dict = torch.load(model_path, map_location="cpu")
+            # remove 'base_model' prefix from state dict keys to match our architecture
+            state_dict = {
+                k.replace("base_model.", ""): v
+                for k, v in model_dict["state_dict"].items()
+            }
+            arch.load_state_dict(state_dict)
 
         # initialize the CNN object with this architecture and class list
         # use 3s duration and expected sample shape for HawkEars
@@ -229,5 +243,43 @@ class HawkEars(CNN):
         pre.insert_action(action_index="to_spec", action=HawkEarsSpec(cfg=config))
         self.preprocessor = pre
 
-        # specify a default layer for GradCAM visualization
-        self.network.cam_target_layers = self.network.blocks[-1]
+    @classmethod
+    def load(cls, path):
+        """reload object after saving to file with .save()
+
+        Args:
+            path: path to file saved using .save()
+
+        Returns:
+            new HawkEars instance
+
+        Note: Note that if you used pickle=True when saving, the model object might not load properly
+        across different versions of OpenSoundscape.
+        """
+        loaded_content = torch.load(path)
+
+        opso_version = (
+            loaded_content.pop("opensoundscape_version")
+            if isinstance(loaded_content, dict)
+            else loaded_content.opensoundscape_version
+        )
+        if opso_version != opensoundscape.__version__:
+            warnings.warn(
+                f"Model was saved with OpenSoundscape version {opso_version}, "
+                f"but you are currently using version {opensoundscape.__version__}. "
+                "This might not be an issue but you should confirm that the model behaves as expected."
+            )
+
+        if isinstance(loaded_content, dict):
+            # initialize with random weights
+            model = cls(checkpoint_url=None)
+            # load up the weights and instantiate from dictionary keys
+            # includes preprocessing parameters and settings
+            state_dict = loaded_content.pop("weights")
+
+            # load weights from checkpoint
+            model.network.load_state_dict(state_dict)
+        else:
+            model = loaded_content  # entire pickled object, not dictionary
+
+        return model
