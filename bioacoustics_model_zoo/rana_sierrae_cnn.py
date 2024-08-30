@@ -22,6 +22,9 @@ def rana_sierrae_cnn(pretrained=True):
     # bandpass spectrograms to 300-2000 Hz
     model.preprocessor.pipeline.bandpass.set(min_f=300, max_f=2000)
 
+    # use legacy interpolation mode
+    model.preprocessor.pipeline.to_tensor.set(use_skimage=True)
+
     ## Training Parameters ##
 
     # modify augmentation routine parameters
