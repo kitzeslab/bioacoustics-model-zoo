@@ -81,6 +81,10 @@ embeddings = model.generate_embeddings(['test.wav']) # generate embeddings on ea
 
 Classification and embedding model trained on a large set of annotated bird vocalizations
 
+Additional required packages:
+
+`tensorflow`, `tensorflow_hub`
+
 Example: 
 
 ```python
@@ -94,6 +98,10 @@ m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
 
 Bird classification CNN for 314 North American species
 
+Additional required packages:
+
+`timm`, `torchaudio`
+
 Example: 
 ```python
 import torch
@@ -106,6 +114,10 @@ m.predict(['test.wav']) # returns dataframe of per-class scores
 Separate audio into channels potentially representing separate sources.
 
 This particular model was trained on bird vocalization data. 
+
+Additional required packages:
+
+`tensorflow`, `tensorflow_hub`
 
 Example:
 
@@ -139,6 +151,10 @@ model.load_separate_write('./temp.wav')
 ### [YAMNet](https://tfhub.dev/google/yamnet/1): 
 
 Embedding model trained on AudioSet YouTube
+
+Additional required packages:
+
+`tensorflow`, `tensorflow_hub`
 
 Example:
 
