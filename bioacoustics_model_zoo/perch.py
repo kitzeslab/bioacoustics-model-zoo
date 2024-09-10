@@ -4,18 +4,18 @@ import pandas as pd
 import numpy as np
 import urllib
 
+import opensoundscape
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
-from opensoundscape.ml.cnn import BaseClassifier
-from opensoundscape import Action, Audio
+from opensoundscape import Action, Audio, CNN
 
 from bioacoustics_model_zoo.utils import (
     collate_to_np_array,
 )
 
 
-class Perch(BaseClassifier):
+class Perch(CNN):
     """load Perch (aka Google Bird Vocalization Classifier) from TensorFlow Hub or local file
 
     [Perch](https://tfhub.dev/google/bird-vocalization-classifier/4) is shared under the
@@ -85,6 +85,7 @@ class Perch(BaseClassifier):
 
         self.preprocessor = AudioPreprocessor(sample_duration=5, sample_rate=32000)
         self.sample_duration = 5
+
         # extend short samples to 5s by padding end with zeros (silence)
         self.preprocessor.insert_action(
             action_index="extend",
@@ -110,114 +111,100 @@ class Perch(BaseClassifier):
             # load class list
             self.classes = pd.read_csv(Path(url) / "label.csv")["ebird2021"].values
 
-    def __call__(self, dataloader):
+        self.device = opensoundscape.ml.cnn._gpu_if_available()
+
+    def __call__(
+        self, dataloader, wandb_session=None, progress_bar=True, return_embeddings=False
+    ):
         """run forward pass of model, iterating through dataloader batches
 
         Args:
             dataloader: instance of SafeAudioDataloader or custom subclass
 
-        Returns:
-            (logits, embeddings, start_times, files)
-
+        Returns: logits, or (logits, embeddings) if return_embeddings=True
+            logits: numpy array of shape (n_samples, n_classes)
+            embeddings: numpy array of shape (n_samples, n_features)
         """
-
         # iterate batches, running inference on each
         logits = []
         embeddings = []
-        logmelspec = []
-        start_times = []
-        files = []
-        for batch in tqdm(dataloader):
-            samples_batch = collate_to_np_array(batch)
+        # logmelspec = []
+        for i, samples_batch in enumerate(tqdm(dataloader, disable=not progress_bar)):
             batch_logits, batch_embeddings = self.network.infer_tf(samples_batch)
             logits.extend(batch_logits.numpy().tolist())
             embeddings.extend(batch_embeddings.numpy().tolist())
-            start_times.extend([s.start_time for s in batch])
-            files.extend([s.source for s in batch])
-        return (np.array(i) for i in (logits, embeddings, start_times, files))
 
-    def generate_embeddings(self, samples, **kwargs):
-        """Generate embeddings for audio data
+            if wandb_session is not None:
+                wandb_session.log(
+                    {
+                        "progress": i / len(dataloader),
+                        "completed_batches": i,
+                        "total_batches": len(dataloader),
+                    }
+                )
+        if return_embeddings:
+            return (np.array(logits), np.array(embeddings))
+        else:
+            return np.array(logits)
 
-        kwargs are passed to SafeAudioDataloader init (num_workers, batch_size, etc)
+    def predict_dataloader(self, samples, **kwargs):
+        """generate dataloader for inference
+
+        kwargs are passed to self.inference_dataloader_class.__init__
+
+        behaves the same as the parent class, except for a custom collate_fn
+        """
+        return super().predict_dataloader(
+            samples=samples, collate_fn=collate_to_np_array, **kwargs
+        )
+
+    def embed(
+        self,
+        samples,
+        progress_bar=True,
+        return_preds=False,
+        return_dfs=True,
+        **kwargs,
+    ):
+        """
+        Generate embeddings for audio files/clips
 
         Args:
-            samples: any of the following:
-                - list of file paths
-                - Dataframe with file as index
-                - Dataframe with file, start_time, end_time of clips as index
-            **kwargs: any arguments to SafeAudioDataloader
+            samples: same as CNN.predict(): list of file paths, OR pd.DataFrame with index
+                containing audio file paths, OR a pd.DataFrame with multi-index (file, start_time,
+                end_time)
+            progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
+            return_preds: bool, if True, returns two outputs (embeddings, logits)
+            return_dfs: bool, if True, returns embeddings as pd.DataFrame with multi-index like
+                .predict(). if False, returns np.array of embeddings [default: True].
+            kwargs are passed to self.predict_dataloader()
 
-        Returns:
-            list of embeddings
+        Returns: (embeddings, preds) if return_preds=True or embeddings if return_preds=False
+            types are pd.DataFrame if return_dfs=True, or np.array if return_dfs=False
+
         """
-        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        _, embeddings, start_times, files = self(dataloader)
-        end_times = start_times + self.sample_duration
-        return pd.DataFrame(
-            embeddings,
-            index=pd.MultiIndex.from_arrays(
-                [files, start_times, end_times],
-                names=["file", "start_time", "end_time"],
-            ),
+        # create dataloader to generate batches of AudioSamples
+        dataloader = self.predict_dataloader(samples, **kwargs)
+
+        # run inference, returns (scores, intermediate_outputs)
+        preds, embeddings = self(
+            dataloader=dataloader,
+            progress_bar=progress_bar,
+            return_embeddings=True,
         )
 
-    def generate_logits(self, samples, **kwargs):
-        """Return (logits, embeddings) for audio data
+        if return_dfs:
+            # put embeddings in DataFrame with multi-index like .predict()
+            embeddings = pd.DataFrame(
+                data=embeddings, index=dataloader.dataset.dataset.label_df.index
+            )
 
-        kwargs are passed to SafeAudioDataloader init (num_workers, batch_size, etc)
-
-        Args:
-            samples: any of the following:
-                - list of file paths
-                - Dataframe with file as index
-                - Dataframe with file, start_time, end_time of clips as index
-            **kwargs: any arguments to SafeAudioDataloader
-        """
-        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        logits, _, start_times, files = self(dataloader)
-        end_times = start_times + self.sample_duration
-        return pd.DataFrame(
-            logits,
-            index=pd.MultiIndex.from_arrays(
-                [files, start_times, end_times],
-                names=["file", "start_time", "end_time"],
-            ),
-            columns=self.classes,
-        )
-
-    # predict is alias for generate_logits
-    predict = generate_logits
-
-    def generate_embeddings_and_logits(self, samples, **kwargs):
-        """Return (embeddings, logits) dataframes for audio data
-
-        Args:
-            samples: any of the following:
-                - list of file paths
-                - Dataframe with file as index
-                - Dataframe with file, start_time, end_time of clips as index
-            **kwargs: any arguments to SafeAudioDataloader
-
-        returns 2 dataframes: (embeddings, logits)
-        """
-        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-
-        logits, embeddings, start_times, files = self(dataloader)
-        end_times = start_times + self.sample_duration
-        logits_df = pd.DataFrame(
-            logits,
-            index=pd.MultiIndex.from_arrays(
-                [files, start_times, end_times],
-                names=["file", "start_time", "end_time"],
-            ),
-            columns=self.classes,
-        )
-        embeddings_df = pd.DataFrame(
-            embeddings,
-            index=pd.MultiIndex.from_arrays(
-                [files, start_times, end_times],
-                names=["file", "start_time", "end_time"],
-            ),
-        )
-        return embeddings_df, logits_df
+        if return_preds:
+            if return_dfs:
+                # put predictions in a DataFrame with same index as embeddings
+                preds = pd.DataFrame(
+                    data=preds, index=dataloader.dataset.dataset.label_df.index
+                )
+            return embeddings, preds
+        else:
+            return embeddings
