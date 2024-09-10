@@ -5,6 +5,7 @@ import csv
 import io
 import pandas as pd
 
+import opensoundscape
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
@@ -20,6 +21,18 @@ def class_names_from_csv(class_map_csv_text):
     ]
     class_names = class_names[1:]  # Skip CSV header
     return class_names
+
+
+class YAMNetDataloader(SafeAudioDataloader):
+    """wraps SafeAudioDataloader to return sample arrays"""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.update({"batch_size": 1})
+        # since YAMNet internally batches and windows the audio, it makes sense to use partial
+        # "remainder" mode even if we get less than sample_duration, eg 60 sec
+        kwargs.update({"final_clip": "remainder"})
+        kwargs.update({"collate_fn": opensoundscape.utils.identity})
+        super().__init__(*args, **kwargs)
 
 
 class YAMNet(BaseClassifier):
@@ -74,7 +87,7 @@ class YAMNet(BaseClassifier):
             ),
         )
         # the dataloader returns a list of AudioSample objects, with .data as audio waveform samples
-        self.inference_dataloader_cls = SafeAudioDataloader
+        self.inference_dataloader_cls = YAMNetDataloader  # SafeAudioDataloader
 
         # load class list (based on example from https://tfhub.dev/google/yamnet/1)
         class_map_path = self.network.class_map_path().numpy()
@@ -83,10 +96,15 @@ class YAMNet(BaseClassifier):
         )
         self.classes = class_names
 
-    def __call__(self, dataloader, **kwargs):
-        """Run inference on a dataloader
+        self.device = opensoundscape.ml.cnn._gpu_if_available()
 
-        returns logits, embeddings, logmelspec, start_times, files
+    def __call__(
+        self,
+        dataloader,
+        wandb_session=None,
+        progress_bar=True,
+    ):
+        """Run inference on a dataloader created with self.predict_dataloader()
 
         see https://tfhub.dev/google/yamnet/1 for details
 
@@ -97,6 +115,13 @@ class YAMNet(BaseClassifier):
         - since batching is internal, choice of input length determines batch size?
         - and we have to manually re-create the start and end times of each window/frame?
         - discards incomplete frame at end (it seems)
+
+        Args:
+            dataloader: a dataloader created with self.predict_dataloader()
+
+        Returns:
+            if return_embeddings=True, returns (logits, embeddings)
+            otherwise, returns logits
         """
         if dataloader.batch_size > 1:
             raise ValueError("batch size must be 1 for YAMNet")
@@ -104,16 +129,17 @@ class YAMNet(BaseClassifier):
         # iterate batches, running inference on each
         logits = []
         embeddings = []
-        logmelspec = []
+        logmelspecs = []
         start_times = []
         files = []
-        for i, batch in enumerate(tqdm(dataloader)):
-            waveform = batch[0].data.samples  # batch is always only one AudioSample
+        for i, batch in enumerate(tqdm(dataloader, disable=not progress_bar)):
             # 1d input is batched into windows/frames internally by YAMNet
-            batch_logits, batch_embeddings, batch_logmelspec = self.network(waveform)
+            sample_array = batch[0].data.samples
+            # discard logmelspec return value to avoid large memory usage
+            batch_logits, batch_embeddings, batch_specs = self.network(sample_array)
             logits.extend(batch_logits.numpy().tolist())
             embeddings.extend(batch_embeddings.numpy().tolist())
-            logmelspec.extend(batch_logmelspec.numpy().tolist())
+            logmelspecs.extend(batch_specs.numpy().tolist())
 
             # frames of returned scores start every 0.48 sec, and are 0.96 sec long
             # the batch start/end time are determined by self.input_duration
@@ -128,43 +154,122 @@ class YAMNet(BaseClassifier):
             # AudioSample.source is the file path
             files.extend([batch[0].source] * len(batch_logits))
 
+            if wandb_session is not None:
+                wandb_session.log(
+                    {
+                        "progress": i / len(dataloader),
+                        "completed_batches": i,
+                        "total_batches": len(dataloader),
+                    }
+                )
+
         return (
-            logits,
-            embeddings,
-            logmelspec,
+            np.array(logits),
+            np.array(embeddings),
+            np.array(logmelspecs),
             start_times,
             files,
         )
 
-    def generate_embeddings(self, samples, **kwargs):
-        """Generate embeddings for audio data
+    def predict(self, samples, progress_bar=True, wandb_session=None, **kwargs):
+        """
+        Generate per-class scores for audio files/clips
 
         Args:
-            samples: any of the following:
+            samples: either of the following:
                 - list of file paths
                 - Dataframe with file as index
                 - Dataframe with file, start_time, end_time of clips as index
-            **kwargs: any arguments to SafeAudioDataloader
+            progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
+            return_dfs: bool, if True, returns scores as pd.DataFrame with multi-index like
+                .predict(). if False, returns np.array of scores [default: True].
+            kwargs are passed to self.predict_dataloader()
 
         Returns:
-            pd.DataFrame of embedding vectors, wwith (file, start_time, end_time) as index
-            Note: more return values than inputs, since YAMNet internally
-            batches and windows the audio into 0.96 sec clips with 0.48 sec overlap
-
+            pd.DataFrame of per-class scores if return_dfs=True, or np.array if return_dfs=False
+            - scores are logit scores with no activation layer applied
         """
-        kwargs.update({"batch_size": 1})
-        # since YAMNet internally batches and windows the audio, it makes sense to use partial
-        # "remainder" mode even if we get less than sample_duration, eg 60 sec
-        kwargs.update({"final_clip": "remainder"})
-        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        _, embeddings, _, start_times, files = self(dataloader)
-        return pd.DataFrame(
+        # create dataloader to generate batches of AudioSamples
+        dataloader = self.predict_dataloader(samples, **kwargs)
+
+        # run inference; discard embeddings and logmelspecs
+        preds, _, _, start_times, files = self(
+            dataloader=dataloader,
+            progress_bar=progress_bar,
+            wandb_session=wandb_session,
+        )
+
+        # put predictions in a DataFrame with multi-index
+        preds = pd.DataFrame(
             index=pd.MultiIndex.from_arrays(
                 [files, start_times, np.array(start_times) + 0.96],
                 names=["file", "start_time", "end_time"],
             ),
-            data=embeddings,
+            data=preds,
         )
+
+        return preds
+
+    def embed(
+        self,
+        samples,
+        progress_bar=True,
+        return_preds=False,
+        return_dfs=True,
+        **kwargs,
+    ):
+        """
+        Generate embeddings for audio files/clips
+
+        wraps self.__call__ by generating a dataloader and handling output preferences
+
+        Args:
+            samples: same as CNN.predict(): list of file paths, OR pd.DataFrame with index
+                containing audio file paths, OR a pd.DataFrame with multi-index (file, start_time,
+                end_time)
+            progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
+            return_preds: bool, if True, returns two outputs (embeddings, logits)
+            return_dfs: bool, if True, returns embeddings as pd.DataFrame with multi-index like
+                .predict(). if False, returns np.array of embeddings [default: True].
+            kwargs are passed to self.predict_dataloader()
+
+        Returns: (embeddings, preds) if return_preds=True or embeddings if return_preds=False
+            types are pd.DataFrame if return_dfs=True, or np.array if return_dfs=False
+            - preds are always logit scores with no activation layer applied
+            - embeddings are the feature vectors from the penultimate layer of the network
+        """
+        # create dataloader to generate batches of AudioSamples
+        dataloader = self.predict_dataloader(samples, **kwargs)
+
+        # run inference
+        preds, embeddings, _, start_times, files = self(
+            dataloader=dataloader,
+            progress_bar=progress_bar,
+        )
+
+        if return_dfs:
+            # put embeddings in DataFrame with multi-index like .predict()
+            embeddings = pd.DataFrame(
+                index=pd.MultiIndex.from_arrays(
+                    [files, start_times, np.array(start_times) + 0.96],
+                    names=["file", "start_time", "end_time"],
+                ),
+                data=embeddings,
+            )
+
+        if return_preds:
+            if return_dfs:
+                # put predictions in a DataFrame with same index as embeddings
+                preds = pd.DataFrame(
+                    index=pd.MultiIndex.from_arrays(
+                        [files, start_times, np.array(start_times) + 0.96],
+                        names=["file", "start_time", "end_time"],
+                    ),
+                    data=preds,
+                )
+            return embeddings, preds
+        else:
+            return embeddings
 
     def generate_logmelspecs(self, samples, **kwargs):
         """Return 2d logmelspec arrays for audio data
@@ -183,100 +288,6 @@ class YAMNet(BaseClassifier):
             n: number of inputs
             m: number of frames per input (input_length // .48 or one less)
         """
-        kwargs.update({"batch_size": 1})
-        # since YAMNet internally batches and windows the audio, it makes sense to use partial
-        # "remainder" mode even if we get less than sample_duration, eg 60 sec
-        kwargs.update({"final_clip": "remainder"})
-        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
+        dataloader = self.predict_dataloader(samples, **kwargs)
         _, _, logmelspecs, _, _ = self(dataloader)
         return logmelspecs
-
-    def generate_logits(
-        self,
-        samples,
-        **kwargs,
-    ):
-        """Generate predictions on a set of samples
-
-        Return dataframe of model output scores for each sample.
-        Optional activation layer for scores
-        (softmax, sigmoid, softmax then logit, or None)
-
-        Args:
-            samples:
-                the files to generate predictions for. Can be:
-                - a dataframe with index containing audio paths, OR
-                - a dataframe with multi-index (file, start_time, end_time), OR
-                - a list (or np.ndarray) of audio file paths
-            **kwargs: additional arguments to inference_dataloader_cls.__init__
-
-        Note: batch size is always 1 since YAMNet internally batches and windows.
-            Use longer input_duration when initializing YAMNet for larger batch size.
-
-        Returns:
-            dataframe of per-class scores with one row per input frame
-            (0.96 sec long, 0.48 sec overlap between frames), since YAMNet
-            internally batches and windows the audio
-
-            Note: returns more rows than inputs because of internal frame/windowing
-        """
-        kwargs.update({"batch_size": 1})
-        # since YAMNet internally batches and windows the audio, it makes sense to use partial
-        # "remainder" mode even if we get less than sample_duration, eg 60 sec
-        kwargs.update({"final_clip": "remainder"})
-        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        scores, _, _, start_times, files = self(dataloader)
-        return pd.DataFrame(
-            index=pd.MultiIndex.from_arrays(
-                [files, start_times, np.array(start_times) + 0.96],
-                names=["file", "start_time", "end_time"],
-            ),
-            data=scores,
-            columns=self.classes,
-        )
-
-    predict = generate_logits  # alias
-
-    def generate_embeddings_and_logits(self, samples, **kwargs):
-        """returns 2 dfs (embeddings, logits) - see generate_logits and generate_embeddings
-
-        Only runs inference once, so faster than calling both methods separately.
-
-        Args:
-            samples: any of the following:
-                - list of file paths
-                - Dataframe with file as index
-                - Dataframe with file, start_time, end_time of clips as index
-            **kwargs: any arguments to SafeAudioDataloader
-
-        Returns:
-            (embeddings, logits) dataframes
-        """
-        # borrows from generate_logits and generate_embeddings code
-        # avoids re-running inference if both outputs are desired
-
-        kwargs.update({"batch_size": 1})
-        # since YAMNet internally batches and windows the audio, it makes sense to use partial
-        # "remainder" mode even if we get less than sample_duration, eg 60 sec
-        kwargs.update({"final_clip": "remainder"})
-        dataloader = self.inference_dataloader_cls(samples, self.preprocessor, **kwargs)
-        scores, embeddings, _, start_times, files = self(dataloader)
-
-        embedding_df = pd.DataFrame(
-            index=pd.MultiIndex.from_arrays(
-                [files, start_times, np.array(start_times) + 0.96],
-                names=["file", "start_time", "end_time"],
-            ),
-            data=embeddings,
-        )
-
-        score_df = pd.DataFrame(
-            index=pd.MultiIndex.from_arrays(
-                [files, start_times, np.array(start_times) + 0.96],
-                names=["file", "start_time", "end_time"],
-            ),
-            data=scores,
-            columns=self.classes,
-        )
-
-        return embedding_df, score_df
