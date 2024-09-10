@@ -74,7 +74,7 @@ Example:
 import torch
 model = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'Perch',trust_repo=True)
 predictions = model.predict(['test.wav']) # predict on the model's classes
-embeddings = model.generate_embeddings(['test.wav']) # generate embeddings on each 5 sec of audio
+embeddings = model.embed(['test.wav']) # generate embeddings on each 5 sec of audio
 ```
 
 ### [BirdNET](https://github.com/kahst/BirdNET-Analyzer)
@@ -87,7 +87,7 @@ Example:
 import torch
 m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET',trust_repo=True)
 m.predict(['test.wav']) # returns dataframe of per-class scores
-m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
+m.embed(['test.wav']) # returns dataframe of embeddings
 ```
 
 ### [HawkEars](https://github.com/jhuus/HawkEars)
@@ -99,6 +99,7 @@ Example:
 import torch
 m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'HawkEars',trust_repo=True)
 m.predict(['test.wav']) # returns dataframe of per-class scores
+m.embed(['test.wav']) # returns dataframe of embeddings
 ```
 
 ### [MixIT Bird SeparationModel](https://github.com/google-research/sound-separation/blob/master/models/bird_mixit/README.md)
@@ -146,7 +147,7 @@ Example:
 import torch
 m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet',trust_repo=True)
 m.predict(['test.wav']) # returns dataframe of per-class scores
-m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
+m.embed(['test.wav']) # returns dataframe of embeddings
 ```
 
 

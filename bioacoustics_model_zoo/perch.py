@@ -39,16 +39,14 @@ class Perch(CNN):
 
     Methods:
         predict: get per-audio-clip per-class scores as pandas DataFrame
-        generate_logits: equivalent to predict()
-        generate_embeddings: make df of embeddings (feature vectors from penultimate layer)
-        generate_embeddings_and_logits: returns 2 dfs: (embeddings, logits)
+        embed: generate embedding layer outputs for samples; optionally return logits as well
 
     Example 1: download from TFHub and generate logits and embeddings
     ```
     import torch
     model=torch.hub.load('kitzeslab/bioacoustics_model_zoo', 'Perch',trust_repo=True)
     predictions = model.predict(['test.wav']) #predict on the model's classes
-    embeddings = model.generate_embeddings(['test.wav']) #generate embeddings on each 5 sec of audio
+    embeddings = model.embed(['test.wav']) #generate embeddings on each 5 sec of audio
     ```
 
     Example 2: loading from local folder
@@ -181,7 +179,8 @@ class Perch(CNN):
 
         Returns: (embeddings, preds) if return_preds=True or embeddings if return_preds=False
             types are pd.DataFrame if return_dfs=True, or np.array if return_dfs=False
-
+            - preds are always logit scores with no activation layer applied
+            - embeddings are the feature vectors from the penultimate layer of the network
         """
         # create dataloader to generate batches of AudioSamples
         dataloader = self.predict_dataloader(samples, **kwargs)

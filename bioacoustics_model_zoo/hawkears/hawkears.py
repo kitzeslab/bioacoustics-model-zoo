@@ -6,7 +6,6 @@ from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.preprocess.actions import Action, BaseAction
 import opensoundscape
 from opensoundscape import Audio, CNN
-from opensoundscape.ml.cnn import BaseClassifier
 
 from bioacoustics_model_zoo.hawkears import hawkears_base_config
 
@@ -180,7 +179,13 @@ class HawkEars(CNN):
             the parameters of the default checkpoint model.
             if None, architecture is initialized with random weights
 
-    Usage: use .predict([audio1.wav,audio2.wav]) to generate class predictions on audio files. See OpenSoundscape.CNN for details.
+    Example:
+    ```
+    import torch
+    m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'HawkEars',trust_repo=True)
+    m.predict(['test.wav'],batch_size=64) # returns dataframe of per-class scores
+    m.embed(['test.wav']) # returns dataframe of embeddings
+    ```
     """
 
     def __init__(

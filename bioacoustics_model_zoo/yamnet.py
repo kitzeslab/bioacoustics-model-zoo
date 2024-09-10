@@ -50,16 +50,16 @@ class YAMNet(BaseClassifier):
 
         Methods:
             predict (alias for generate_logits): get per-audio-clip per-class scores in dataframe format
-            generate_embeddings: returns dataframe of embeddings (features from penultimate layer)
-            generate_logmelspecs: returns list of 2d log-valued mel spectrogram arrays
-            generate_embeddings_and_logits: returns 2 dfs (embeddings, logits)
+            embed: returns dataframe of embeddings (features from penultimate layer); optionally also return predictions
+            generate_logmelspecs: returns np.array of 2d log-valued mel spectrogram arrays
 
         Example:
         ```
         import torch
         m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet',trust_repo=True)
         m.predict(['test.wav']) # returns dataframe of per-class scores
-        m.generate_embeddings(['test.wav']) # returns dataframe of embeddings
+        m.embed(['test.wav']) # returns dataframe of embeddings
+        m.generate_logmelspecs(['test.wav']) # returns np.array of logmelspecs
         ```
         """
 
