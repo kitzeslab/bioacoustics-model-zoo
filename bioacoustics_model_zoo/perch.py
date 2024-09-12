@@ -10,9 +10,7 @@ from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
 from opensoundscape import Action, Audio, CNN
 
-from bioacoustics_model_zoo.utils import (
-    collate_to_np_array,
-)
+from bioacoustics_model_zoo.utils import collate_to_np_array, AudioSampleArrayDataloader
 
 
 class Perch(CNN):
@@ -102,7 +100,7 @@ class Perch(CNN):
                 Audio.extend_to, is_augmentation=False, duration=self.sample_duration
             ),
         )
-        self.inference_dataloader_cls = SafeAudioDataloader
+        self.inference_dataloader_cls = AudioSampleArrayDataloader
 
         # Load pre-trained model: handle url from tfhub or local dir
         if urllib.parse.urlparse(path).scheme in ("http", "https"):
@@ -174,7 +172,9 @@ class Perch(CNN):
         family_logits = []
         genus_logits = []
         logmelspec = []
-        for i, samples_batch in enumerate(tqdm(dataloader, disable=not progress_bar)):
+        for i, (samples_batch, _) in enumerate(
+            tqdm(dataloader, disable=not progress_bar)
+        ):
             outs = self.network.infer_tf(samples_batch)
             if self.version < 8:
                 # earlier versions just output (logits, embeddings)

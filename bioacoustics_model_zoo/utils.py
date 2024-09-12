@@ -29,10 +29,15 @@ def download_github_file(url, save_dir=".", verbose=True):
 def collate_to_np_array(audio_samples):
     """
     takes list of AudioSample objects with type(sample.data)==opensoundscape.Audio
-    and returns np.array of shape [batch, length of audio signal]
+    and returns (samples, labels);
+        - samples is np.array of shape [batch, length of audio signal]
+        - labels is np.array of shape [batch, n_classes]
     """
     try:
-        return np.array([a.data.samples for a in audio_samples])
+        return (
+            np.array([a.data.samples for a in audio_samples]),
+            np.vstack([a.labels.values for a in audio_samples]),
+        )
     except Exception as exc:
         raise ValueError(
             "Must pass list of AudioSample with Audio object as .data"
