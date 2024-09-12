@@ -81,6 +81,10 @@ embeddings = model.embed(['test.wav']) # generate embeddings on each 5 sec of au
 
 Classification and embedding model trained on a large set of annotated bird vocalizations
 
+Additional required packages:
+
+`tensorflow`, `tensorflow_hub`
+
 Example: 
 
 ```python
@@ -93,6 +97,10 @@ m.embed(['test.wav']) # returns dataframe of embeddings
 ### [HawkEars](https://github.com/jhuus/HawkEars)
 
 Bird classification CNN for 314 North American species
+
+Additional required packages:
+
+`timm`, `torchaudio`
 
 Example: 
 ```python
@@ -107,6 +115,10 @@ m.embed(['test.wav']) # returns dataframe of embeddings
 Separate audio into channels potentially representing separate sources.
 
 This particular model was trained on bird vocalization data. 
+
+Additional required packages:
+
+`tensorflow`, `tensorflow_hub`
 
 Example:
 
@@ -140,6 +152,10 @@ model.load_separate_write('./temp.wav')
 ### [YAMNet](https://tfhub.dev/google/yamnet/1): 
 
 Embedding model trained on AudioSet YouTube
+
+Additional required packages:
+
+`tensorflow`, `tensorflow_hub`
 
 Example:
 
