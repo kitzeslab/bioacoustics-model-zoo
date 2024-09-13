@@ -15,32 +15,12 @@ from bioacoustics_model_zoo.utils import (
     AudioSampleArrayDataloader,
     download_github_file,
 )
+from bioacoustics_model_zoo.tensorflow_wrapper import (
+    TensorFlowModelWithPytorchClassifier,
+)
 
 
-class MLPClassifier(torch.nn.Module):
-    """initialize a fully connected NN with ReLU activations"""
-
-    def __init__(self, input_size, output_size, hidden_layer_sizes=()):
-        super().__init__()
-        # constructor_name tuple informs how to recreate the network shape
-        self.constructor_name = (input_size, output_size, hidden_layer_sizes)
-        self.add_module("hidden_layers", torch.nn.Sequential())
-        shapes = [input_size] + list(hidden_layer_sizes) + [output_size]
-        for i, (in_size, out_size) in enumerate(zip(shapes[:-2], shapes[1:-1])):
-            self.hidden_layers.add_module(
-                f"layer_{i}", torch.nn.Linear(in_size, out_size)
-            )
-            self.hidden_layers.add_module(f"relu_{i}", torch.nn.ReLU())
-        self.add_module("classifier", torch.nn.Linear(shapes[-2], shapes[-1]))
-        self.classifier_layer = "classifier"
-
-    def forward(self, x):
-        x = self.hidden_layers(x)
-        x = self.classifier(x)
-        return x
-
-
-class BirdNET(CNN):
+class BirdNET(TensorFlowModelWithPytorchClassifier):
     def __init__(
         self,
         checkpoint_url="https://github.com/kahst/BirdNET-Analyzer/raw/main/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP16.tflite",
@@ -121,15 +101,7 @@ class BirdNET(CNN):
         # clf is assigned to .network and is the only part that is trained with .trai(),
         # the birdnet feature extractor (self.tf_model) is frozen
         # note that this clf will have random weights
-        self.embedding_size = 1024
-        clf = MLPClassifier(input_size=self.embedding_size, output_size=len(classes))
-        super().__init__(architecture=clf, classes=classes, sample_duration=3)
-
-        self.use_custom_classifier = False
-        """(bool) whether to generate predictions using BirdNET or the custom classifier
-
-        initially False, but gets set to True if .train() is called
-        """
+        super().__init__(embedding_size=1024, classes=classes, sample_duration=3)
 
         # download model if URL, otherwise find it at local path:
         if checkpoint_url.startswith("http"):
@@ -156,35 +128,6 @@ class BirdNET(CNN):
         )
         self.inference_dataloader_cls = AudioSampleArrayDataloader
         self.train_dataloader_cls = AudioSampleArrayDataloader
-
-    def initialize_custom_classifier(self, hidden_layer_sizes=(), classes=None):
-        """initialize a custom classifier to replace the BirdNET classifier head
-
-        The classifier is a multi-layer perceptron with ReLU activations and a final
-        linear layer. The input size is the size of the embeddings from the BirdNET model,
-        and the output size is the number of classes.
-
-        The new classifier (self.network) will have random weights, and can be trained with
-        self.train().
-
-        Args:
-            hidden_layer_sizes: tuple of int, sizes of hidden layers in the classifier
-                [default: ()]
-            classes: list of str, class names for the classifier. Will run self.change_classes(classes)
-                if not None. If None, uses self.classes. [default: None]
-
-        Effects:
-            sets self.network to a new MLPClassifier with the specified shape
-            runs self.change_classes(classes) if classes is not None, resulting in
-                self.classes = classes
-        """
-        if classes is not None:
-            self.change_classes(classes)
-        self.network = MLPClassifier(
-            input_size=self.embedding_size,
-            output_size=len(self.classes),
-            hidden_layer_sizes=hidden_layer_sizes,
-        )
 
     def _batch_forward(self, batch_data):
         """run forward pass on a batch of data
@@ -342,105 +285,3 @@ class BirdNET(CNN):
             return embeddings, preds
         else:
             return embeddings
-
-    def training_step(self, samples, batch_idx):
-        """a standard Lightning method used within the training loop, acting on each batch
-
-        returns loss
-
-        Effects:
-            logs metrics and loss to the current logger
-        """
-        # switch from BirdNET classifier head to custom classifier (self.network)
-        self.use_custom_classifier = True
-        batch_data, batch_labels = samples
-        # first run the preprocessed samples through the birdnet feature extractor
-        # discard the logits produced by the birdnet classifier, just keep embeddings
-        embeddings, _ = self._batch_forward(batch_data)
-        # then run the embeddings through the trainable classifier with a typical "train" step
-        return super().training_step(
-            (torch.tensor(embeddings), torch.tensor(batch_labels)), batch_idx
-        )
-
-    def save(self, *args, **kwargs):
-        """save model to path
-
-        Note: the tf Interpreter is not pickable, so it is set to None before saving
-        and re-assigned after saving (even if saving fails)
-
-        Args: see opensoundscape.ml.cnn.CNN.save()
-        """
-        assert isinstance(
-            self.network, MLPClassifier
-        ), "model.save() and model.load() only supports reloading .network if it is and instance of the Classifier class"
-
-        # since the tf Interpreter is not pickable, we don't include it in the saved file
-        # instead we can recreate it with __init__ and a checkpoint
-        temp_tf_model = self.tf_model
-        try:
-            # save the model with .tf_model (Tensorflow Interpreter) set to None
-            self.tf_model = None
-            super().save(*args, **kwargs)
-        finally:
-            # reassign the Tensorflow Interpreter to .tf_model
-            # this needs to happen even if the model saving fails!
-            self.tf_model = temp_tf_model
-
-    @classmethod
-    def load(cls, path, **kwargs):
-        """load model from path
-
-        re-loads custom classifier head trained by user
-        (only supports the Classifier class)
-
-        Sets self.use_custom_classifier to True, since loading from a file
-        is only necessary if the user has trained a custom classifier
-        (otherwise simply use BirdNET() to create a new model)
-
-        Args:
-            path: path to model saved using BirdNET.save()
-            kwargs are passed to self.__init__()
-
-        Returns:
-            model including any custom trained classifier head
-        """
-        import warnings
-
-        model_dict = torch.load(path)
-
-        opso_version = (
-            model_dict.pop("opensoundscape_version")
-            if isinstance(model_dict, dict)
-            else model_dict.opensoundscape_version
-        )
-        if opso_version != opensoundscape.__version__:
-            warnings.warn(
-                f"Model was saved with OpenSoundscape version {opso_version}, "
-                f"but you are currently using version {opensoundscape.__version__}. "
-                "This might not be an issue but you should confirm that the model behaves as expected."
-            )
-
-        if isinstance(model_dict, dict):
-            # load up the weights and instantiate from dictionary keys
-            # includes preprocessing parameters and settings
-            # assumes that model_dict["architecture"] is a tuple of args for __init__
-            # of the MLPClassifier class (which will be true if model was saved with BirdNET.save()
-            # and MLPClassifier was used to create the model.network)
-            model = cls(**kwargs)
-            hidden_layer_sizes = model_dict["architecture"][2]
-            model.initialize_custom_classifier(
-                hidden_layer_sizes=hidden_layer_sizes, classes=model_dict["classes"]
-            )
-            # load state dict of custom classifier
-            model.network.load_state_dict(model_dict["weights"])
-
-        else:
-            model = model_dict  # entire pickled object, not dictionary
-            opso_version = model.opensoundscape_version
-
-            # create the BirdNET TF Interpreter using __init__ with default args
-            # since it is not saved with self.save() due to pickling issues
-            model.tf_model = cls(**kwargs).tf_model
-
-        model.use_custom_classifier = True
-        return model
