@@ -3,6 +3,7 @@
 subclassed by BirdNET and Perch
 """
 
+import pandas as pd
 import torch
 
 import opensoundscape
@@ -23,6 +24,12 @@ class AugmentationAudioPreprocessor(AudioPreprocessor):
             noise_dB=(-30, 0),
         )
         self.insert_action("add_noise", add_noise_action)
+
+        # time wrap
+        time_shift_action = actions.Action(
+            action_functions.random_wrap_audio,
+            probability=0.5,
+        )
 
 
 class MLPClassifier(torch.nn.Module):
@@ -70,6 +77,29 @@ class TensorFlowModelWithPytorchClassifier(CNN):
 
         initially False, but gets set to True if .train() is called
         """
+
+        self.pregenerate_and_cache_embeddings = True
+
+        self.tf_model = None  # set by subclass, holds the TensorFlow model
+
+    def train(self, train_df, validation_df, *args, **kwargs):
+        """train Pytorch classifier layer(s) on training samples
+
+        self.pregenerate_and_cache_embeddings (bool) affects how training is performed:
+        - if True, embeddings are generated once for the training and validation datasets
+            meaning that data augmentation cannot be applied. This method is much faster
+            and matches the behavior of training in the BirdNET-Analyzer API
+        - if False, embeddings are generated on-the-fly during training, allowing
+            for stochastic data augmentation to be applied on each epoch. This method is
+            similar to typical model training in OpenSoundcape but will be much slower
+            and is not recommended if training without a GPU.
+
+        Args: see opensoundscape.ml.cnn.CNN.train()
+        """
+        if self.pregenerate_and_cache_embeddings:
+            self._train_embeddings_cache = self.embed(train_df, return_dfs=False)
+            self._val_embeddings_cache = self.embed(validation_df, return_dfs=False)
+        return super().train(*args, **kwargs)
 
     def initialize_custom_classifier(self, hidden_layer_sizes=(), classes=None):
         """initialize a custom classifier to replace the BirdNET classifier head
@@ -124,6 +154,29 @@ class TensorFlowModelWithPytorchClassifier(CNN):
         """
         raise NotImplementedError("This method should be implemented in subclasses")
 
+    def train_dataloader(self, samples, batch_size, num_workers, *args, **kwargs):
+        if self.pregenerate_and_cache_embeddings:
+            assert isinstance(samples, pd.DataFrame), "samples must be a DataFrame"
+            # first generate embeddings for the training dataset
+            # then make a dataloader that fetches and returns cached embeddings
+            ds = EmbeddingFetcherDataset(self.embed(samples))
+
+        class EmbeddingFetcherDataset(torch.utils.data.Dataset):
+            """A dataset that fetches embeddings and labels"""
+
+            def __init__(self, embeddings):
+                self.embeddings = embeddings
+
+            def __len__(self):
+                return len(self.embeddings)
+
+            def __getitem__(self, idx):
+                return torch.tensor(self.embeddings.iloc[idx].values)
+
+        return torch.utils.data.DataLoader(
+            ds, batch_size=batch_size, num_workers=num_workers, shuffle=True
+        )
+
     def training_step(self, samples, batch_idx):
         """a standard Lightning method used within the training loop, acting on each batch
 
@@ -136,7 +189,12 @@ class TensorFlowModelWithPytorchClassifier(CNN):
         # first run the preprocessed samples through the birdnet feature extractor
         # discard the logits produced by the tensorflow classifier, just keep embeddings
         self.use_custom_classifier = False
-        embeddings, _ = self._batch_forward(batch_data)
+
+        if self.quick_train:
+            # TODO: need a different dataloader for quick_train: returns shuffled batches of embeddings and labels
+            embeddings = batch_data
+        else:
+            embeddings, _ = self._batch_forward(batch_data)
         # switch from Tensorflow classifier head to custom classifier (self.network)
         self.use_custom_classifier = True
         # then run the embeddings through the trainable classifier with a typical "train" step
