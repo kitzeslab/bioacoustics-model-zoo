@@ -8,59 +8,7 @@ import opensoundscape
 from opensoundscape import Audio, CNN
 
 from bioacoustics_model_zoo.hawkears import hawkears_base_config
-
-# Define custom EfficientNet_v2 configurations.
-
-from timm.models import efficientnet
-
-
-def build_efficientnet_architecture(model_name, **kwargs):
-    if model_name == "1":
-        # ~ 1.5M parameters
-        channel_multiplier = 0.4
-        depth_multiplier = 0.4
-    elif model_name == "2":
-        # ~ 2.0M parameters
-        channel_multiplier = 0.4
-        depth_multiplier = 0.5
-    elif model_name == "3":
-        # ~ 3.4M parameters
-        channel_multiplier = 0.5
-        depth_multiplier = 0.6
-    elif model_name == "4":
-        # ~ 4.8M parameters
-        channel_multiplier = 0.6
-        depth_multiplier = 0.6
-    elif model_name == "5":
-        # ~ 5.7M parameters
-        channel_multiplier = 0.6
-        depth_multiplier = 0.7
-    elif model_name == "6":
-        # ~ 7.5M parameters
-        channel_multiplier = 0.7
-        depth_multiplier = 0.7
-    elif model_name == "7":
-        # ~ 8.3M parameters
-        channel_multiplier = 0.7
-        depth_multiplier = 0.8
-    else:
-        raise Exception(f"Unknown custom EfficientNetV2 model name: {model_name}")
-
-    arch = efficientnet._gen_efficientnetv2_s(
-        "efficientnetv2_rw_t",
-        channel_multiplier=channel_multiplier,
-        depth_multiplier=depth_multiplier,
-        in_chans=1,
-        **kwargs,
-    )
-
-    arch.classifier_layer = "classifier"
-    arch.embedding_layer = "global_pool"
-    arch.cam_layer = "conv_head"
-
-    return arch
-
-
+from bioacoustics_model_zoo.hawkears.architecture_constructors import get_hgnet
 import torchaudio
 
 
@@ -169,84 +117,149 @@ from bioacoustics_model_zoo.utils import download_github_file
 from pathlib import Path
 
 
-class HawkEars(CNN):
-    """HawkEars bird classification CNN for 314 North American sp
+class Ensemble(torch.nn.Module):
+    """Ensemble of multiple models for classification
 
     Args:
-        config: use None for default, or pass a valid object created with the HawkEars repo
-        checkpoint_url: URL or local file path to model checkpoint. Default is recommended.
-            Note that some values in this class (such as the architecture) are hard coded to match
-            the parameters of the default checkpoint model.
-            if None, architecture is initialized with random weights
+        models: list of models to use in the ensemble
+    """
+
+    def __init__(self, models):
+        super(Ensemble, self).__init__()
+        self.models = models
+        for i, m in enumerate(models):
+            self.add_module(f"model_{i}", m)
+
+    def forward(self, x):
+        """forward pass through the ensemble"""
+        outputs = [model(x) for model in self.models]
+        return torch.mean(torch.stack(outputs), dim=0)
+
+
+class HawkEars(CNN):
+    """HawkEars bird classification CNN v0.1.0
+
+    Note that the HawkEars github repo implements various heuristics and filters
+    when predicting class presence, while this implementation simply returns the
+    ensembled model outputs.
+
+    Note that embed() currently uses embeddings from self.network.model_4, the
+    largest of the ensembled inference models. By contrast, in the HawkEars
+    GitHub repo, embedding currently uses instead an entirely different model
+    with an efficientnet architecture, so results will differ from here.
+
+    Args:
+        config: use None for default, or pass a valid object created with the
+        HawkEars repo
 
     Example:
-    ```
-    import torch
-    m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'HawkEars',trust_repo=True)
-    m.predict(['test.wav'],batch_size=64) # returns dataframe of per-class scores
-    m.embed(['test.wav']) # returns dataframe of embeddings
+    ``` import torch
+    m=torch.hub.load('kitzeslab/bioacoustics-model-zoo',
+    'HawkEars',trust_repo=True) m.predict(['test.wav'],batch_size=64) # returns
+    dataframe of per-class scores m.embed(['test.wav']) # returns dataframe of
+    embeddings
     ```
     """
 
     def __init__(
         self,
-        config=None,
-        checkpoint_url="https://github.com/jhuus/HawkEars/blob/24bc5a3e031866bc3ff81343bffff83429ee7897/data/ckpt/custom_efficientnet_5B.ckpt",
+        cfg=None,
     ):
-        # use weights from file, or random weights if checkpoint_url is None
-        if checkpoint_url is None:
-            model_path = None
-        else:
+        # use custom config if provided, otherwise default
+        if cfg is None:
+            cfg = hawkears_base_config.BaseConfig()
+        self.cfg = cfg
+
+        ckpt_stem = "https://github.com/jhuus/HawkEars/raw/refs/tags/0.1.0/data/ckpt/"
+        all_checkpoints = [f"{ckpt_stem}hgnet{i}.ckpt" for i in range(1, 6)]
+        all_models = []
+        classes = None
+        class_codes = None
+
+        for ckpt_path in all_checkpoints:
             # download model if URL, otherwise find it at local path:
-            if checkpoint_url.startswith("http"):
+            if ckpt_path.startswith("http"):
                 print("downloading model from URL...")
-                model_path = download_github_file(checkpoint_url)
+                model_path = download_github_file(ckpt_path)
             else:
-                model_path = checkpoint_url
+                model_path = ckpt_path
             model_path = str(Path(model_path).resolve())  # get absolute path as string
             assert Path(model_path).exists(), f"Model path {model_path} does not exist"
+            print(f"loading model from local path {model_path}...")
+            mdict = torch.load(model_path, map_location=torch.device("cpu"))
 
-        # load list of classes
-        class_list_path = Path(__file__).with_name("classes_edited.txt")
-        classes = pd.read_csv(class_list_path)  # two columns: common, alpha
+            model_name = mdict["hyper_parameters"]["model_name"]
 
-        # this checkpoint was trained on 314 classes
-        # initialize the architecture of the correct shape
-        arch = build_efficientnet_architecture("5", num_classes=314)
+            m_classes = mdict["hyper_parameters"]["train_class_names"]
+            m_class_codes = mdict["hyper_parameters"]["train_class_codes"]
 
-        # load the weights from checkpoint file
-        if model_path is not None:
-            model_dict = torch.load(model_path, map_location="cpu")
+            if class_codes is None:
+                class_codes = m_class_codes
+            else:
+                assert (
+                    class_codes == m_class_codes
+                ), "Class codes do not match across models"
+
+            if classes is None:
+                classes = m_classes
+            else:
+                assert classes == m_classes, "Class names do not match across models"
+
+            # Note: if a new tag has an ensemble of models uses a different
+            # architecture, we will need to change the model constructor logic
+            hgshape = model_name.split("_")[-1]
+            model = get_hgnet(hgshape, num_classes=len(classes))
             # remove 'base_model' prefix from state dict keys to match our architecture
             state_dict = {
-                k.replace("base_model.", ""): v
-                for k, v in model_dict["state_dict"].items()
+                k.replace("base_model.", ""): v for k, v in mdict["state_dict"].items()
             }
-            arch.load_state_dict(state_dict)
+            # load checkpoint weights into torch module
+            model.load_state_dict(state_dict)
+
+            all_models.append(model)
+
+        # initialize a module that runs the ensemble and averages outputs
+        arch = Ensemble(all_models)
+
+        # TODO: think about what to set here, just picked the largest model for now
+        arch.cam_layer = "model_4.stages.3"
+        arch.embedding_layer = "model_4.head.flatten"
+        arch.classifier_layer = "model_4.head.fc"
 
         # initialize the CNN object with this architecture and class list
         # use 3s duration and expected sample shape for HawkEars
         super(HawkEars, self).__init__(
             arch,
-            classes=classes["Common Name"].values,
-            sample_duration=3,
-            sample_shape=[192, 384, 1],
+            classes=classes,
+            sample_duration=cfg.audio.segment_len,
+            sample_shape=[cfg.audio.spec_height, cfg.audio.spec_width, 1],
         )
+        self.class_codes = class_codes
+        """4-letter alpha codes (or similar for non-birds) corresponding to self.classes"""
 
         # compose the preprocessing pipeline:
         # load audio with 3s framing; extend to 3s if needed
         # create spectrogram based on config values, using same functions as HawkEars to ensure same results
         # normalize spectrogram to max=1
-        pre = AudioPreprocessor(sample_duration=3, sample_rate=40960)
+        pre = AudioPreprocessor(
+            sample_duration=cfg.audio.segment_len, sample_rate=cfg.audio.sampling_rate
+        )
         pre.insert_action(
             action_index="extend",
-            action=Action(Audio.extend_to, is_augmentation=False, duration=3),
+            action=Action(
+                Audio.extend_to, is_augmentation=False, duration=cfg.audio.segment_len
+            ),
         )
 
         # note: can specify pre.pipeline.to_spec.device = 'cuda' to use cuda for spectrogram creation
         # but mps does not support spectrogram creation as of April 2024
-        pre.insert_action(action_index="to_spec", action=HawkEarsSpec(cfg=config))
+        pre.insert_action(action_index="to_spec", action=HawkEarsSpec(cfg=cfg))
         self.preprocessor = pre
+
+    def freeze_feature_extractor(self):
+        # the hgmodels all have .fc as the final classification layer
+        # so we can freeze all except each model's .fc
+        return self.freeze_layers_except([m.fc for m in self.network.models])
 
     @classmethod
     def load(cls, path):
@@ -276,8 +289,8 @@ class HawkEars(CNN):
             )
 
         if isinstance(loaded_content, dict):
-            # initialize with random weights
-            model = cls(checkpoint_url=None)
+            # initialize with random weights is not currently supported, so init as normal
+            model = cls()
             # load up the weights and instantiate from dictionary keys
             # includes preprocessing parameters and settings
             state_dict = loaded_content.pop("weights")
