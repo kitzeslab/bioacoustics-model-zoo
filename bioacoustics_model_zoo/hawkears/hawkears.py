@@ -2,7 +2,7 @@ import warnings
 import pandas as pd
 import cv2
 
-from opensoundscape.preprocess.preprocessors import AudioPreprocessor
+from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
 from opensoundscape.preprocess.actions import Action, BaseAction
 import opensoundscape
 from opensoundscape import Audio, CNN
@@ -150,7 +150,12 @@ class HawkEars(CNN):
 
     Args:
         config: use None for default, or pass a valid object created with the
-        HawkEars repo
+            HawkEars repo
+        ckpt_stem: path or URL containing checkpoint files for all ensembled models
+            (pass a local path if you have already downloaded the checkpoints; use the
+            default URL to download checkpoints from GitHub)
+        force_reload: (bool) default False skips checkpoint downloads if local path already
+            exists; True downloads and over-writes existing checkpoint files if ckpt_stem is URL
 
     Example:
     ``` import torch
@@ -164,13 +169,14 @@ class HawkEars(CNN):
     def __init__(
         self,
         cfg=None,
+        ckpt_stem="https://github.com/jhuus/HawkEars/raw/refs/tags/0.1.0/data/ckpt/",
+        force_reload=False,
     ):
         # use custom config if provided, otherwise default
         if cfg is None:
             cfg = hawkears_base_config.BaseConfig()
         self.cfg = cfg
 
-        ckpt_stem = "https://github.com/jhuus/HawkEars/raw/refs/tags/0.1.0/data/ckpt/"
         all_checkpoints = [f"{ckpt_stem}hgnet{i}.ckpt" for i in range(1, 6)]
         all_models = []
         classes = None
@@ -179,13 +185,16 @@ class HawkEars(CNN):
         for ckpt_path in all_checkpoints:
             # download model if URL, otherwise find it at local path:
             if ckpt_path.startswith("http"):
-                print("downloading model from URL...")
-                model_path = download_github_file(ckpt_path)
+                # will skip download if file exists; to force re-download, delete existing checkpoints
+                print("Downloading model from URL...")
+                model_path = download_github_file(
+                    ckpt_path, redownload_existing=force_reload
+                )
             else:
                 model_path = ckpt_path
             model_path = str(Path(model_path).resolve())  # get absolute path as string
             assert Path(model_path).exists(), f"Model path {model_path} does not exist"
-            print(f"loading model from local path {model_path}...")
+            print(f"Loading model from local checkpoint {model_path}...")
             mdict = torch.load(model_path, map_location=torch.device("cpu"))
 
             model_name = mdict["hyper_parameters"]["model_name"]
@@ -241,7 +250,7 @@ class HawkEars(CNN):
         # load audio with 3s framing; extend to 3s if needed
         # create spectrogram based on config values, using same functions as HawkEars to ensure same results
         # normalize spectrogram to max=1
-        pre = AudioPreprocessor(
+        pre = AudioAugmentationPreprocessor(
             sample_duration=cfg.audio.segment_len, sample_rate=cfg.audio.sampling_rate
         )
         pre.insert_action(
@@ -260,6 +269,20 @@ class HawkEars(CNN):
         # the hgmodels all have .fc as the final classification layer
         # so we can freeze all except each model's .fc
         return self.freeze_layers_except([m.fc for m in self.network.models])
+
+    def change_classes(*args, **kwargs):
+        raise NotImplementedError(
+            """HawkEars contains an ensemble of models. Think carefully about
+            what you want to do: perhaps you want to create a separate
+            classifier which you can train on embeddings from HawkEars: 
+
+            ```python
+            from opensoundscape.ml import shallow_classifier
+            hawkears = HawkEars()
+            clf = shallow_classifier.MLPClassifier(2048,n_classes,())
+            shallow_classifier.fit_classifier_on_embeddings(embedding_model=hawkears, classifier_model=clf, ...)
+            """
+        )
 
     @classmethod
     def load(cls, path):

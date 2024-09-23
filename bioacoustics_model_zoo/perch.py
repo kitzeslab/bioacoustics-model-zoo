@@ -6,7 +6,7 @@ import urllib
 import torch
 
 import opensoundscape
-from opensoundscape.preprocess.preprocessors import AudioPreprocessor
+from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
 from opensoundscape import Action, Audio, CNN
@@ -134,7 +134,9 @@ class Perch(TensorFlowModelWithPytorchClassifier):
 
         # Configure preprocessing
         # Perch expects audio signal input as 32kHz mono 5s clips (160,000 samples)
-        self.preprocessor = AudioPreprocessor(sample_duration=5, sample_rate=32000)
+        self.preprocessor = AudioAugmentationPreprocessor(
+            sample_duration=5, sample_rate=32000
+        )
         self.sample_duration = 5
 
         # extend short samples to 5s by padding end with zeros (silence)
@@ -186,6 +188,7 @@ class Perch(TensorFlowModelWithPytorchClassifier):
         if self.use_custom_classifier:
             # use custom classifier to generate logits
             emb_tensor = torch.tensor(outs["embedding"]).to(self.device)
+            self.network.to(self.device)
             logits = self.network(emb_tensor).detach().cpu().numpy()
             # add additional key to output dictionary
             outs["custom_classifier"] = logits

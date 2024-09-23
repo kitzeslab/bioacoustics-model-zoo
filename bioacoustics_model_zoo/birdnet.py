@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 import opensoundscape
-from opensoundscape.preprocess.preprocessors import AudioPreprocessor
+from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
 from opensoundscape.ml.cnn import CNN
@@ -120,7 +120,9 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         self.tf_model.allocate_tensors()
 
         # initialize preprocessor and choose dataloader class
-        self.preprocessor = AudioPreprocessor(sample_duration=3, sample_rate=48000)
+        self.preprocessor = AudioAugmentationPreprocessor(
+            sample_duration=3, sample_rate=48000
+        )
         # extend short samples to 3s by padding end with zeros (silence)
         self.preprocessor.insert_action(
             action_index="extend",
@@ -160,6 +162,7 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         if self.use_custom_classifier:
             # run self.network on the features from birdnet to predict using self.network
             tensors = torch.tensor(batch_embeddings).to(self.device)
+            self.network.to(self.device)
             batch_logits = self.network(tensors).detach().cpu().numpy()
         else:
             batch_logits = self.tf_model.get_tensor(output_details["index"])

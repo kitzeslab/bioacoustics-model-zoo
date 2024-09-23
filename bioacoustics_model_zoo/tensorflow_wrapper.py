@@ -8,58 +8,7 @@ import torch
 
 import opensoundscape
 from opensoundscape.ml.cnn import CNN
-from opensoundscape.preprocess.preprocessors import AudioPreprocessor
-from opensoundscape.preprocess import actions, action_functions
-
-
-class AugmentationAudioPreprocessor(AudioPreprocessor):
-    """AudioPreprocessor that applies augmentations to audio samples"""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        # add noise
-        add_noise_action = actions.Action(
-            action_functions.audio_add_noise,
-            noise_dB=(-30, 0),
-        )
-        self.insert_action("add_noise", add_noise_action)
-
-        # time wrap
-        time_shift_action = actions.Action(
-            action_functions.random_wrap_audio,
-            probability=0.5,
-        )
-
-
-class MLPClassifier(torch.nn.Module):
-    """initialize a fully connected NN with ReLU activations"""
-
-    def __init__(self, input_size, output_size, hidden_layer_sizes=()):
-        super().__init__()
-
-        # constructor_name tuple hints to TensorFlowModelWithPytorchClassifier.load()
-        # how to recreate the network with the appropriate shape
-        self.constructor_name = (input_size, output_size, hidden_layer_sizes)
-
-        # add fully connected layers and RELU activations
-        self.add_module("hidden_layers", torch.nn.Sequential())
-        shapes = [input_size] + list(hidden_layer_sizes) + [output_size]
-        for i, (in_size, out_size) in enumerate(zip(shapes[:-2], shapes[1:-1])):
-            self.hidden_layers.add_module(
-                f"layer_{i}", torch.nn.Linear(in_size, out_size)
-            )
-            self.hidden_layers.add_module(f"relu_{i}", torch.nn.ReLU())
-        # add a final fully connected layer (the only layer if no hidden layers)
-        self.add_module("classifier", torch.nn.Linear(shapes[-2], shapes[-1]))
-
-        # hint to opensoundscape which layer is the final classifier layer
-        self.classifier_layer = "classifier"
-
-    def forward(self, x):
-        x = self.hidden_layers(x)
-        x = self.classifier(x)
-        return x
+from opensoundscape.ml.shallow_classifier import MLPClassifier
 
 
 class TensorFlowModelWithPytorchClassifier(CNN):
@@ -78,28 +27,7 @@ class TensorFlowModelWithPytorchClassifier(CNN):
         initially False, but gets set to True if .train() is called
         """
 
-        self.pregenerate_and_cache_embeddings = True
-
         self.tf_model = None  # set by subclass, holds the TensorFlow model
-
-    def train(self, train_df, validation_df, *args, **kwargs):
-        """train Pytorch classifier layer(s) on training samples
-
-        self.pregenerate_and_cache_embeddings (bool) affects how training is performed:
-        - if True, embeddings are generated once for the training and validation datasets
-            meaning that data augmentation cannot be applied. This method is much faster
-            and matches the behavior of training in the BirdNET-Analyzer API
-        - if False, embeddings are generated on-the-fly during training, allowing
-            for stochastic data augmentation to be applied on each epoch. This method is
-            similar to typical model training in OpenSoundcape but will be much slower
-            and is not recommended if training without a GPU.
-
-        Args: see opensoundscape.ml.cnn.CNN.train()
-        """
-        if self.pregenerate_and_cache_embeddings:
-            self._train_embeddings_cache = self.embed(train_df, return_dfs=False)
-            self._val_embeddings_cache = self.embed(validation_df, return_dfs=False)
-        return super().train(*args, **kwargs)
 
     def initialize_custom_classifier(self, hidden_layer_sizes=(), classes=None):
         """initialize a custom classifier to replace the BirdNET classifier head
@@ -130,6 +58,11 @@ class TensorFlowModelWithPytorchClassifier(CNN):
             hidden_layer_sizes=hidden_layer_sizes,
         )
 
+    @property
+    def custom_classifier(self):
+        """alias for self.network"""
+        return self.network
+
     def _batch_forward(self, batch_data):
         """This method should return the tensorflow model output  logits if
         self.use_custom_classifier is False, otherwise it should use the custom
@@ -154,29 +87,6 @@ class TensorFlowModelWithPytorchClassifier(CNN):
         """
         raise NotImplementedError("This method should be implemented in subclasses")
 
-    def train_dataloader(self, samples, batch_size, num_workers, *args, **kwargs):
-        if self.pregenerate_and_cache_embeddings:
-            assert isinstance(samples, pd.DataFrame), "samples must be a DataFrame"
-            # first generate embeddings for the training dataset
-            # then make a dataloader that fetches and returns cached embeddings
-            ds = EmbeddingFetcherDataset(self.embed(samples))
-
-        class EmbeddingFetcherDataset(torch.utils.data.Dataset):
-            """A dataset that fetches embeddings and labels"""
-
-            def __init__(self, embeddings):
-                self.embeddings = embeddings
-
-            def __len__(self):
-                return len(self.embeddings)
-
-            def __getitem__(self, idx):
-                return torch.tensor(self.embeddings.iloc[idx].values)
-
-        return torch.utils.data.DataLoader(
-            ds, batch_size=batch_size, num_workers=num_workers, shuffle=True
-        )
-
     def training_step(self, samples, batch_idx):
         """a standard Lightning method used within the training loop, acting on each batch
 
@@ -186,15 +96,10 @@ class TensorFlowModelWithPytorchClassifier(CNN):
             logs metrics and loss to the current logger
         """
         batch_data, batch_labels = samples
-        # first run the preprocessed samples through the birdnet feature extractor
+        # first run the preprocessed samples through the tensorflow feature extractor
         # discard the logits produced by the tensorflow classifier, just keep embeddings
         self.use_custom_classifier = False
-
-        if self.quick_train:
-            # TODO: need a different dataloader for quick_train: returns shuffled batches of embeddings and labels
-            embeddings = batch_data
-        else:
-            embeddings, _ = self._batch_forward(batch_data)
+        embeddings, _ = self._batch_forward(batch_data)
         # switch from Tensorflow classifier head to custom classifier (self.network)
         self.use_custom_classifier = True
         # then run the embeddings through the trainable classifier with a typical "train" step
@@ -212,7 +117,7 @@ class TensorFlowModelWithPytorchClassifier(CNN):
         """
         assert isinstance(
             self.network, MLPClassifier
-        ), "model.save() and model.load() only supports reloading .network if it is and instance of the Classifier class"
+        ), "model.save() and model.load() only supports reloading .network if it is and instance of the MLPClassifier class"
 
         # since the tf Interpreter is not pickable, we don't include it in the saved file
         # instead we can recreate it with __init__ and a checkpoint

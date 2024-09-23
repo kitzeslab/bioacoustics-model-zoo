@@ -4,15 +4,19 @@ import numpy as np
 from pathlib import Path
 
 
-def download_github_file(url, save_dir=".", verbose=True):
-    # Replace these variables with your specific GitHub repository and file information
-    url = url.replace("/blob/", "/raw/")  # direct download link
+def download_github_file(url, save_dir=".", verbose=True, redownload_existing=False):
+    save_path = Path(save_dir) / Path(url).name
+    if Path(save_path).exists() and not redownload_existing:
+        if verbose:
+            print(f"File {save_path} already exists; skipping download.")
+        return save_path
 
+    # format for github download url:
     # url = f"https://raw.githubusercontent.com/{github_username}/{github_repo}/master/{file_path}"
     # headers = {"Authorization": f"token {github_token}"}
+    url = url.replace("/blob/", "/raw/")  # direct download link
     response = requests.get(url)  # , headers=headers)
 
-    save_path = Path(save_dir) / Path(url).name
     if response.status_code == 200:
         with open(save_path, "wb") as f:
             f.write(response.content)
