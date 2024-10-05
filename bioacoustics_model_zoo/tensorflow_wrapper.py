@@ -87,25 +87,94 @@ class TensorFlowModelWithPytorchClassifier(CNN):
         """
         raise NotImplementedError("This method should be implemented in subclasses")
 
-    def training_step(self, samples, batch_idx):
-        """a standard Lightning method used within the training loop, acting on each batch
+    # def training_step(self, samples, batch_idx):
+    #     """a standard Lightning method used within the training loop, acting on each batch
 
-        returns loss
+    #     returns loss
 
-        Effects:
-            logs metrics and loss to the current logger
+    #     Effects:
+    #         logs metrics and loss to the current logger
+    #     """
+    #     batch_data, batch_labels = samples
+    #     # first run the preprocessed samples through the tensorflow feature extractor
+    #     # discard the logits produced by the tensorflow classifier, just keep embeddings
+    #     self.use_custom_classifier = False
+    #     embeddings, _ = self._batch_forward(batch_data)
+    #     # switch from Tensorflow classifier head to custom classifier (self.network)
+    #     self.use_custom_classifier = True
+    #     # then run the embeddings through the trainable classifier with a typical "train" step
+    #     return super().training_step(
+    #         (torch.tensor(embeddings), torch.tensor(batch_labels)), batch_idx
+    #     )
+    def train(
+        self,
+        train_df,
+        validation_df,
+        n_augmentation_variants=0,
+        embedding_batch_size=1,
+        embedding_num_workers=0,
+        steps=1000,
+        optimizer=None,
+        criterion=None,
+        device=torch.device("cpu"),
+    ):
+        """train a custom classifier head on the embeddings from the tensorflow model
+
+        this function calls opensoundscape.ml.shallow_classifier.fit_classifier_on_embeddings()
+
+        Before calling this function, the user should call self.initialize_custom_classifier()
+            or self.change_classes() to modify the classifier head to match the number of classes.
+
+        We can't train the tensorflow model (it is inference only), so this function only trains
+        the classification head. First, it embeds the training and validation samples with
+        the .tf_model. If num_augmentation_variants is >0, it generates embeddings on
+        stochastically augmented versions of the samples.
+        Next, it trains the custom classifier head (self.network) without any batching.
+
+        Running this function is equivalent to embeddings samples then fitting a classifier,
+        a workflow demonstrated in the opensoundscape tutorial notebooks.
+
+        Args:
+            train_df: pd.DataFrame, training data
+            validation_df: pd.DataFrame, validation data
+            n_augmentation_variants: int, number of augmentations to apply to each sample
+                [default: 0]
+            batch_size: int, batch size for embedding [default: 1]
+            num_workers: int, number of workers for embedding data loading [default: 0]
+            steps: int, number of training steps [default: 1000]
+            optimizer: torch.optim.Optimizer, optimizer for training
+                [default: None uses torch.optim.Adam()]
+            criterion: torch.nn.Module, loss function for training
+                [default: None uses torch.nn.CrossEntropyLoss()]
+            device: torch.device, device for training [default: torch.device("cpu")]
+
+
+        Example:
+        ```
+        model = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET')
+        model.initialize_custom_classifier(hidden_layer_sizes=(256,), classes=["A", "B", "C"])
+        model.train(train_df, validation_df)
+        model.predict(validation_df)
+        ```
         """
-        batch_data, batch_labels = samples
-        # first run the preprocessed samples through the tensorflow feature extractor
-        # discard the logits produced by the tensorflow classifier, just keep embeddings
-        self.use_custom_classifier = False
-        embeddings, _ = self._batch_forward(batch_data)
-        # switch from Tensorflow classifier head to custom classifier (self.network)
-        self.use_custom_classifier = True
-        # then run the embeddings through the trainable classifier with a typical "train" step
-        return super().training_step(
-            (torch.tensor(embeddings), torch.tensor(batch_labels)), batch_idx
+        from opensoundscape.ml.shallow_classifier import fit_classifier_on_embeddings
+
+        fit_classifier_on_embeddings(
+            embedding_model=self,
+            classifier_model=self.network,
+            train_df=train_df,
+            validation_df=validation_df,
+            n_augmentation_variants=n_augmentation_variants,
+            embedding_batch_size=embedding_batch_size,
+            embedding_num_workers=embedding_num_workers,
+            steps=steps,
+            optimizer=optimizer,
+            criterion=criterion,
+            device=device,
         )
+
+        # switch from original (.tf_model) to custom trained classifier (.network) for inference
+        self.use_custom_classifier = True
 
     def save(self, *args, **kwargs):
         """save model to path

@@ -98,7 +98,7 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         # initialize parent class with some default values
         # default custom classifier is one fully connected layer
         # user can create a different classifier before training
-        # clf is assigned to .network and is the only part that is trained with .trai(),
+        # clf is assigned to .network and is the only part that is trained with .train(),
         # the birdnet feature extractor (self.tf_model) is frozen
         # note that this clf will have random weights
         super().__init__(embedding_size=1024, classes=classes, sample_duration=3)
