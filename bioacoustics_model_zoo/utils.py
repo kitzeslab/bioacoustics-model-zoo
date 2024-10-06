@@ -4,15 +4,19 @@ import numpy as np
 from pathlib import Path
 
 
-def download_github_file(url, save_dir=".", verbose=True):
-    # Replace these variables with your specific GitHub repository and file information
-    url = url.replace("/blob/", "/raw/")  # direct download link
+def download_github_file(url, save_dir=".", verbose=True, redownload_existing=False):
+    save_path = Path(save_dir) / Path(url).name
+    if Path(save_path).exists() and not redownload_existing:
+        if verbose:
+            print(f"File {save_path} already exists; skipping download.")
+        return save_path
 
+    # format for github download url:
     # url = f"https://raw.githubusercontent.com/{github_username}/{github_repo}/master/{file_path}"
     # headers = {"Authorization": f"token {github_token}"}
+    url = url.replace("/blob/", "/raw/")  # direct download link
     response = requests.get(url)  # , headers=headers)
 
-    save_path = Path(save_dir) / Path(url).name
     if response.status_code == 200:
         with open(save_path, "wb") as f:
             f.write(response.content)
@@ -29,10 +33,15 @@ def download_github_file(url, save_dir=".", verbose=True):
 def collate_to_np_array(audio_samples):
     """
     takes list of AudioSample objects with type(sample.data)==opensoundscape.Audio
-    and returns np.array of shape [batch, length of audio signal]
+    and returns (samples, labels);
+        - samples is np.array of shape [batch, length of audio signal]
+        - labels is np.array of shape [batch, n_classes]
     """
     try:
-        return np.array([a.data.samples for a in audio_samples])
+        return (
+            np.array([a.data.samples for a in audio_samples]),
+            np.vstack([a.labels.values for a in audio_samples]),
+        )
     except Exception as exc:
         raise ValueError(
             "Must pass list of AudioSample with Audio object as .data"

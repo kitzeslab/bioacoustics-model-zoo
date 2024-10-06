@@ -13,6 +13,7 @@ def rana_sierrae_cnn(pretrained=True):
         classes=["rana_sierrae", "negative"],
         sample_duration=2.0,
         single_target=True,
+        channels=3,
     )
 
     ## Preprocessing Parameters ##
@@ -20,6 +21,9 @@ def rana_sierrae_cnn(pretrained=True):
     # modify preprocessing of the CNN:
     # bandpass spectrograms to 300-2000 Hz
     model.preprocessor.pipeline.bandpass.set(min_f=300, max_f=2000)
+
+    # use legacy interpolation mode
+    model.preprocessor.pipeline.to_tensor.set(use_skimage=True)
 
     ## Training Parameters ##
 

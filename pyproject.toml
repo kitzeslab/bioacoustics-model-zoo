@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "bioacoustics-model-zoo"
+version = "0.11.0"
+description = "Public repository of machine learning models for bioacoustics, with OpenSoundscape integration"
+authors = ["sammlapp <sammlapp@gmail.com>"]
+readme = "README.md"
+packages = [{include = "bioacoustics_model_zoo"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.8.0"
+pytest = "^8.3.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
