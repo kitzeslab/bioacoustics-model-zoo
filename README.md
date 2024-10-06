@@ -4,18 +4,44 @@ Pre-trained models for bioacoustic classification tasks
 ## Set up / Installation
 To use the bioacoustics model zoo: 
 1. create a python environment (3.9-3.11 supported) using conda or your preferred package manager
+
 2. install the required packages: download the requirements.txt file, then run `pip install -r /path/to/requirements.txt`
-3. use the torch.hub API to access models:
+
+3. Use the models in any of the following ways:
+
+#### Use the torch.hub API to access models:
+
 ```python
 import torch
 model = torch.hub.load('kitzeslab/bioacoustics-model-zoo','Perch')
 ```
 
-or the opensoundscape API:
+#### Use the opensoundscape API:
 
 ```python
 from opensoundscape.ml import bioacoustics_model_zoo as bmz
 model = bmz.load('Perch')
+```
+
+#### Install this repository as a Python package, 
+Installing as a package may be necessary to overcome issues with num_workers>0, per this
+[issue](https://github.com/pytorch/hub/issues/353).
+
+For example, you can install the repo as a package in a python environment using pip:
+
+```
+pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo
+```
+
+If you want to intall a specific branch or release of the model zoo, for instance release 0.11.0, add an @ then the tag at the end of the command: 
+```
+pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@0.11.0
+```
+
+You can now use the package directly in python:
+```
+import bioacoustics_model_zoo as bmz
+model = bmz.HawkEars()
 ```
 
 # Basic usage
