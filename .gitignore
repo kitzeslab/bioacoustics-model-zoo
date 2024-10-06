@@ -4,3 +4,4 @@ __pycache__/
 resources/bird_mixit_model_checkpoints
 resources/perch_0.1.2
 bioacoustics_model_zoo/test.ipynb
+*.ckpt
