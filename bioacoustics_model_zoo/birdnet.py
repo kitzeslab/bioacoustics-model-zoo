@@ -11,11 +11,11 @@ from tqdm.autonotebook import tqdm
 from opensoundscape.ml.cnn import CNN
 from opensoundscape import Audio, Action
 
-from .utils import (
+from bioacoustics_model_zoo.utils import (
     AudioSampleArrayDataloader,
     download_github_file,
 )
-from .tensorflow_wrapper import (
+from bioacoustics_model_zoo.tensorflow_wrapper import (
     TensorFlowModelWithPytorchClassifier,
 )
 

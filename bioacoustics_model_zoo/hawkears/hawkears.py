@@ -7,8 +7,8 @@ from opensoundscape.preprocess.actions import Action, BaseAction
 import opensoundscape
 from opensoundscape import Audio, CNN
 
-from . import hawkears_base_config
-from .architecture_constructors import get_hgnet
+from bioacoustics_model_zoo.hawkears import hawkears_base_config
+from bioacoustics_model_zoo.hawkears.architecture_constructors import get_hgnet
 import torchaudio
 
 
@@ -113,7 +113,7 @@ class HawkEarsSpec(BaseAction):
 
 
 import torch
-from ..utils import download_github_file
+from bioacoustics_model_zoo.utils import download_github_file
 from pathlib import Path
 
 
