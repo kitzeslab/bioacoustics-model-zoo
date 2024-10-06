@@ -26,15 +26,50 @@ from opensoundscape import CNN as _CNN
 # pytorch models
 from bioacoustics_model_zoo.rana_sierrae_cnn import rana_sierrae_cnn
 
+
+class MissingTFDependency:
+    def __init__(self, *args, **kwargs):
+        raise ImportError(
+            "Tensorflow is required to use this model and was not found in the environment"
+        )
+
+
 # tensorflow requirement
-if tf is not None:
+if tf is None:
+
+    class BirdNET(MissingTFDependency):
+        pass
+
+    class SeparationModel(MissingTFDependency):
+        pass
+
+    class YAMNet(MissingTFDependency):
+        pass
+
+    class Perch(MissingTFDependency):
+        pass
+
+else:
     from bioacoustics_model_zoo.birdnet import BirdNET
     from bioacoustics_model_zoo.mixit_separation import SeparationModel
     from bioacoustics_model_zoo.yamnet import YAMNet
     from bioacoustics_model_zoo.perch import Perch
 
+
 # timm and torchaudio requirement
-if timm is not None and torchaudio is not None:
+class MissingHawkearsDependency:
+    def __init__(self, *args, **kwargs):
+        raise ImportError(
+            "timm and torchaudio packages are required to use this model and at least one was not found in the environment"
+        )
+
+
+if timm is None or torchaudio is None:
+
+    class HawkEars(MissingHawkearsDependency):
+        pass
+
+else:
     from bioacoustics_model_zoo.hawkears.hawkears import HawkEars
 
 ## see instructions here for hubconf file:
