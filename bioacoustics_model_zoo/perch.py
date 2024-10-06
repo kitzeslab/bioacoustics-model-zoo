@@ -11,8 +11,8 @@ from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
 from opensoundscape import Action, Audio, CNN
 
-from bioacoustics_model_zoo.utils import collate_to_np_array, AudioSampleArrayDataloader
-from bioacoustics_model_zoo.tensorflow_wrapper import (
+from .utils import collate_to_np_array, AudioSampleArrayDataloader
+from .tensorflow_wrapper import (
     TensorFlowModelWithPytorchClassifier,
 )
 
