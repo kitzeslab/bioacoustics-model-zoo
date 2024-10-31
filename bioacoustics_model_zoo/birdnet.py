@@ -23,8 +23,8 @@ from bioacoustics_model_zoo.tensorflow_wrapper import (
 class BirdNET(TensorFlowModelWithPytorchClassifier):
     def __init__(
         self,
-        checkpoint_url="https://github.com/kahst/BirdNET-Analyzer/raw/main/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP16.tflite",
-        label_url="https://github.com/kahst/BirdNET-Analyzer/blob/main/labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt",
+        checkpoint_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP16.tflite",
+        label_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt",
         num_tflite_threads=1,
     ):
         """load BirdNET model from .tflite file on GitHub
