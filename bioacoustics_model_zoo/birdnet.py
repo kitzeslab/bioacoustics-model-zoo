@@ -115,7 +115,9 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
 
         # load tflite model
         self.tf_model = tflite.Interpreter(
-            model_path=model_path, num_threads=num_tflite_threads
+            model_path=model_path,
+            num_threads=num_tflite_threads,
+            experimental_preserve_all_tensors=True,
         )
         self.tf_model.allocate_tensors()
 

@@ -5,3 +5,5 @@ resources/bird_mixit_model_checkpoints
 resources/perch_0.1.2
 bioacoustics_model_zoo/test.ipynb
 bioacoustics_model_zoo/hawkears/*.ckpt
+bioacoustics_model_zoo/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt
+bioacoustics_model_zoo/BirdNET_GLOBAL_6K_V2.4_Model_FP16.tflite
