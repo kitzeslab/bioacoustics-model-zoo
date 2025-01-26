@@ -12,6 +12,8 @@ from tqdm.autonotebook import tqdm
 from opensoundscape.ml.cnn import BaseClassifier
 from opensoundscape import Audio, Action
 
+from bioacoustics_model_zoo.utils import register_bmz_model
+
 
 def class_names_from_csv(class_map_csv_text):
     """Returns list of class names corresponding to score vector."""
@@ -35,9 +37,10 @@ class YAMNetDataloader(SafeAudioDataloader):
         super().__init__(*args, **kwargs)
 
 
+@register_bmz_model
 class YAMNet(BaseClassifier):
     def __init__(self, url="https://tfhub.dev/google/yamnet/1", input_duration=60):
-        """load TF model hub google Perch model, wrap in OpSo TensorFlowHubModel class
+        """load YAMNet Audio CNN from tensorflow hub
 
         Args:
             url to model path (default is YAMNet v1)
@@ -97,6 +100,12 @@ class YAMNet(BaseClassifier):
         self.classes = class_names
 
         self.device = opensoundscape.ml.cnn._gpu_if_available()
+
+    def __display__(self):
+        return "YAMNnet model loaded from tfhub"
+
+    def __repr__(self):
+        return "YAMNnet model loaded from tfhub"
 
     def __call__(
         self,

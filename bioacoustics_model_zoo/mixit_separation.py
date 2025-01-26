@@ -7,8 +7,6 @@ import warnings
 
 
 class SeparationModel(object):
-    """Tensorflow audio separation model."""
-
     def __init__(
         self,
         checkpoint,
@@ -16,7 +14,7 @@ class SeparationModel(object):
         input_tensor_name="input_audio/receiver_audio:0",
         output_tensor_name="denoised_waveforms:0",
     ):
-        """Initializes the separation model from checkpoint
+        """Initializes "MixIt" Tensorflow audio separation model from local checkpoint
 
         note: to use this class with torch.hub.load(), you must provide the
         checkpoint='/path/to/downloaded/checkpoint'. To download the MixIt checkpoint,

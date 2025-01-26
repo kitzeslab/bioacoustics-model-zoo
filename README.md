@@ -90,18 +90,6 @@ https://github.com/kitzeslab/bioacoustics-model-zoo/blob/593fe39a9e0f712c04d6e20
 
 # Model list
 
-### [Perch](https://tfhub.dev/google/bird-vocalization-classifier/4): 
-
-Embedding and bird classification model trained on Xeno Canto
-
-Example:
-
-```python
-import torch
-model = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'Perch',trust_repo=True)
-predictions = model.predict(['test.wav']) # predict on the model's classes
-embeddings = model.embed(['test.wav']) # generate embeddings on each 5 sec of audio
-```
 
 ### [BirdNET](https://github.com/kahst/BirdNET-Analyzer)
 
@@ -114,26 +102,93 @@ Additional required packages:
 Example: 
 
 ```python
-import torch
-m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET',trust_repo=True)
+import bioacoustics_model_zoo as bmz
+m = bmz.BirdNET()
 m.predict(['test.wav']) # returns dataframe of per-class scores
 m.embed(['test.wav']) # returns dataframe of embeddings
 ```
 
+Training: 
+
+The `.train()` method trains a shallow fully-connected neural network as a
+classification head while keeping the feature extractor frozen, since the
+BirdNET feature extractor is not open-source. 
+
+Please see opensoundscape.org documentation and tutorials for detailed walk
+through. Once you have multi-hot training and validation label dataframes with
+(file, start_time, end_time) multi-index and a column for each class, training
+looks like this:
+
+```python
+# load the pre-trained BirdNET tensorflow model
+m=bmz.BirdNET()
+# add a 2-layer PyTorch classification head
+m.initialize_custom_classifier(classes=train_df.columns, hidden_layer_sizes=(100,))
+# embed the training/validation samples with 5 augmented variations each,
+# then fit the classification head
+m.train(
+  train_df,
+  val_df,
+  n_augmentation_variants=5,
+  embedding_batch_size=64,
+  embedding_num_workers=4
+)
+# save the custom BirdNET model to a file
+m.save(save_path)
+# later, to reload your fine-tuned BirdNET from the saved object:
+# m = bmz.BirdNET.load(save_path)
+```
+
+
+### [Perch](https://tfhub.dev/google/bird-vocalization-classifier/4): 
+
+Embedding and bird classification model trained on Xeno Canto
+
+Example:
+
+```python
+import bioacoustics_model_zoo as bmz
+m = bmz.Perch()
+predictions = model.predict(['test.wav']) # predict on the model's classes
+embeddings = model.embed(['test.wav']) # generate embeddings on each 5 sec of audio
+```
+
+Training: see `BirdNET` example above, training is equivalent (only trains
+shallow classifier on frozen feature extractor).
+
 ### [HawkEars](https://github.com/jhuus/HawkEars)
 
-Bird classification CNN for 314 North American species
+Bird classification model for 314 North American species
+
+Note that HawkEars internally uses an ensemble of 5 CNNs. 
 
 Additional required packages:
 
 `timm`, `torchaudio`
 
 Example: 
+
 ```python
-import torch
-m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'HawkEars',trust_repo=True)
+import bioacoustics_model_zoo as bmz
+m = bmz.HawkEars()
 m.predict(['test.wav']) # returns dataframe of per-class scores
 m.embed(['test.wav']) # returns dataframe of embeddings
+```
+
+Training: Training this model is equivalent to training the Opensoundscape.CNN
+class. Please see documentation on opensoundscape.org for detailed examples and
+walk-throughs. 
+
+Because 5 models are ensembled, training is a bit heavy - you may need small
+batch sizes, and you might consider removing all but one model. 
+
+By default, training HawkEars uses a lower learning rate on the feature
+extractor than on the classifier - a "fine tuning" paradigm. These values can be modified in the `.optimizer_params` dictionary. 
+
+```python
+import bioacoustics_model_zoo as bmz
+m = bmz.HawkEars()
+m.train(train_df,val_df,epochs=10,batch_size=64,num_workers=4)
 ```
 
 ### [MixIT Bird SeparationModel](https://github.com/google-research/sound-separation/blob/master/models/bird_mixit/README.md)
@@ -156,14 +211,12 @@ install gsutil then run the following command in your terminal:
 
 Then, use the model in python:
 ```python
-import torch
+import bioacoustics_model_zoo as bmz
 # provide the local path to the checkpoint when creating the object
-model = torch.hub.load(
-    'kitzeslab/bioacoustics-model-zoo',
-    'SeparationModel',
-    checkpoint='/path/to/bird_mixit_model_checkpoints/output_sources4/model.ckpt-3223090',
-    trust_repo=True,
-) # creates 4 channels; use output_sources8 to separate into 8 channels
+# this example creates 4 channels; use output_sources8 to separate into 8 channels
+model = bmz.SeparationModel(
+  checkpoint='/path/to/bird_mixit_model_checkpoints/output_sources4/model.ckpt-3223090',
+)
 
 # separate opensoundscape Audio object into 4 channels:
 # note that it seems to work best on 5 second segments
@@ -186,21 +239,21 @@ Additional required packages:
 Example:
 
 ```python
-import torch
-m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet',trust_repo=True)
+import bioacoustics_model_zoo as bmz
+m = bmz.YAMNet()
 m.predict(['test.wav']) # returns dataframe of per-class scores
 m.embed(['test.wav']) # returns dataframe of embeddings
 ```
 
 
-### rana_sierrae_cnn: 
+### RanaSierraeCNN: 
 
 Detect underwater vocalizations of _Rana sierrae_, the Sierra Nevada Yellow-legged Frog
 
 example: 
 ```python
-import torch
-m = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'rana_sierrae_cnn',trust_repo=True)
+import bioacoustics_model_zoo as bmz
+m = bmz.RanaSierraeCNN()
 m.predict(['test.wav']) # returns dataframe of per-class scores
 ```
 

@@ -24,7 +24,7 @@ from opensoundscape import CNN as _CNN
 # each function we import will be visible in torch.hub.list()
 
 # pytorch models
-from bioacoustics_model_zoo.rana_sierrae_cnn import rana_sierrae_cnn
+from bioacoustics_model_zoo.rana_sierrae_cnn import RanaSierraeCNN
 
 
 class MissingTFDependency:

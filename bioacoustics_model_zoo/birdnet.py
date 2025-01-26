@@ -14,12 +14,14 @@ from opensoundscape import Audio, Action
 from bioacoustics_model_zoo.utils import (
     AudioSampleArrayDataloader,
     download_github_file,
+    register_bmz_model,
 )
 from bioacoustics_model_zoo.tensorflow_wrapper import (
     TensorFlowModelWithPytorchClassifier,
 )
 
 
+@register_bmz_model
 class BirdNET(TensorFlowModelWithPytorchClassifier):
     def __init__(
         self,
@@ -27,7 +29,7 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         label_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt",
         num_tflite_threads=1,
     ):
-        """load BirdNET model from .tflite file on GitHub
+        """load BirdNET global bird classification CNN from .tflite file on GitHub
 
         [BirdNET](https://github.com/kahst/BirdNET-Analyzer) is shared under the CC A-NC-SA 4.0.
         Suggested Citation:

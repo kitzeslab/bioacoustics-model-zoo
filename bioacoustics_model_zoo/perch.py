@@ -11,12 +11,17 @@ from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
 from opensoundscape import Action, Audio, CNN
 
-from bioacoustics_model_zoo.utils import collate_to_np_array, AudioSampleArrayDataloader
+from bioacoustics_model_zoo.utils import (
+    collate_to_np_array,
+    AudioSampleArrayDataloader,
+    register_bmz_model,
+)
 from bioacoustics_model_zoo.tensorflow_wrapper import (
     TensorFlowModelWithPytorchClassifier,
 )
 
 
+@register_bmz_model
 class Perch(TensorFlowModelWithPytorchClassifier):
 
     def __init__(self, version=8, path=None):

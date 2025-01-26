@@ -11,7 +11,17 @@ from bioacoustics_model_zoo.hawkears import hawkears_base_config
 from bioacoustics_model_zoo.hawkears.architecture_constructors import get_hgnet
 import torchaudio
 
+import torch
 
+from opensoundscape.ml.cnn import register_model_cls
+from opensoundscape.preprocess.actions import register_action_cls
+
+HAWKEARS_CKPT_URLS = {
+    "v0.1.0": "https://github.com/jhuus/HawkEars/raw/refs/tags/0.1.0/data/ckpt/",
+}
+
+
+@register_action_cls
 class HawkEarsSpec(BaseAction):
     """hawkears preprocessing of audio signal to normalized spectrogram
 
@@ -113,7 +123,7 @@ class HawkEarsSpec(BaseAction):
 
 
 import torch
-from bioacoustics_model_zoo.utils import download_github_file
+from bioacoustics_model_zoo.utils import download_github_file, register_bmz_model
 from pathlib import Path
 
 
@@ -131,13 +141,21 @@ class Ensemble(torch.nn.Module):
             self.add_module(f"model_{i}", m)
 
     def forward(self, x):
-        """forward pass through the ensemble"""
+        """forward pass through the ensemble, average outputs from across models"""
         outputs = [model(x) for model in self.models]
         return torch.mean(torch.stack(outputs), dim=0)
 
 
+@register_bmz_model
+@register_model_cls
 class HawkEars(CNN):
-    """HawkEars bird classification CNN v0.1.0
+    """HawkEars Canadian bird classification CNN v0.1.0
+
+    Hawkears[1] was developed by Jan Huus and is actively maintained on the
+    [GitHub repository](https://github.com/jhuus/HawkEars)
+
+    [1] Huus, Jan, et al. 2024 "Hawkears: A Regional, High-Performance Avian
+    Acoustic Classifier." SSRN.
 
     Note that the HawkEars github repo implements various heuristics and filters
     when predicting class presence, while this implementation simply returns the
@@ -153,10 +171,11 @@ class HawkEars(CNN):
             HawkEars repo
         ckpt_stem: path or URL containing checkpoint files for all ensembled models
             (pass a local path if you have already downloaded the checkpoints; use the
-            default URL to download checkpoints from GitHub)
+            default to download v0.1.0 checkpoints from GitHub)
         force_reload: (bool) default False skips checkpoint downloads if local path already
             exists; True downloads and over-writes existing checkpoint files if ckpt_stem is URL
-
+        classes: list of class names ONLY if replacing classifier head with a custom classifier
+            - if None (default), uses classes from pre-trained checkpoint
     Example:
     ``` import torch
     m=torch.hub.load('kitzeslab/bioacoustics-model-zoo',
@@ -169,7 +188,7 @@ class HawkEars(CNN):
     def __init__(
         self,
         cfg=None,
-        ckpt_stem="https://github.com/jhuus/HawkEars/raw/refs/tags/0.1.0/data/ckpt/",
+        ckpt_stem=None,
         force_reload=False,
     ):
         # use custom config if provided, otherwise default
@@ -177,20 +196,24 @@ class HawkEars(CNN):
             cfg = hawkears_base_config.BaseConfig()
         self.cfg = cfg
 
-        all_checkpoints = [f"{ckpt_stem}hgnet{i}.ckpt" for i in range(1, 6)]
+        if ckpt_stem is None:
+            ckpt_stem = HAWKEARS_CKPT_URLS["v0.1.0"]
+
+        all_checkpoints = [Path(".") / f"hgnet{i}.ckpt" for i in range(1, 6)]
         all_models = []
-        classes = None
         class_codes = None
+        classes = None
 
         for ckpt_path in all_checkpoints:
             # download model if URL, otherwise find it at local path:
-            if ckpt_path.startswith("http"):
+            if str(ckpt_path).startswith("http"):
                 # will skip download if file exists; to force re-download, delete existing checkpoints
                 print("Downloading model from URL...")
                 model_path = download_github_file(
                     ckpt_path, redownload_existing=force_reload
                 )
             else:
+                assert ckpt_path.exists(), f"Checkpoint not found at {ckpt_path}"
                 model_path = ckpt_path
             model_path = str(Path(model_path).resolve())  # get absolute path as string
             assert Path(model_path).exists(), f"Model path {model_path} does not exist"
@@ -204,15 +227,8 @@ class HawkEars(CNN):
 
             if class_codes is None:
                 class_codes = m_class_codes
-            else:
-                assert (
-                    class_codes == m_class_codes
-                ), "Class codes do not match across models"
-
             if classes is None:
                 classes = m_classes
-            else:
-                assert classes == m_classes, "Class names do not match across models"
 
             # Note: if a new tag has an ensemble of models uses a different
             # architecture, we will need to change the model constructor logic
@@ -231,9 +247,9 @@ class HawkEars(CNN):
         arch = Ensemble(all_models)
 
         # TODO: think about what to set here, just picked the largest model for now
-        arch.cam_layer = "model_4.stages.3"
-        arch.embedding_layer = "model_4.head.flatten"
-        arch.classifier_layer = "model_4.head.fc"
+        arch.cam_layer = "model_4.stages.3"  # default layer for activation maps
+        arch.embedding_layer = "model_4.head.flatten"  # default layer for embeddings
+        arch.classifier_layer = "model_4.head.fc"  # layer accessed w/ `self.classifier`
 
         # initialize the CNN object with this architecture and class list
         # use 3s duration and expected sample shape for HawkEars
@@ -265,37 +281,34 @@ class HawkEars(CNN):
         pre.insert_action(action_index="to_spec", action=HawkEarsSpec(cfg=cfg))
         self.preprocessor = pre
 
+        # set the classifier learning rate to be higher than the feature extractor
+        # Note: I have not experimented to find optimal learning rates or relative learning rates
+        self.optimizer_params["classifier_lr"] = 0.01
+        self.optimizer_params["kwargs"]["lr"] = 0.001
+
     def freeze_feature_extractor(self):
         # the hgmodels all have .fc as the final classification layer
         # so we can freeze all except each model's .fc
         return self.freeze_layers_except([m.fc for m in self.network.models])
 
-    def change_classes(*args, **kwargs):
-        raise NotImplementedError(
-            """HawkEars contains an ensemble of models. Think carefully about
-            what you want to do: perhaps you want to create a separate
-            classifier which you can train on embeddings from HawkEars: 
-
-            ```python
-            from opensoundscape.ml import shallow_classifier
-            hawkears = HawkEars()
-            clf = shallow_classifier.MLPClassifier(2048,n_classes,())
-            shallow_classifier.fit_classifier_on_embeddings(embedding_model=hawkears, classifier_model=clf, ...)
-            """
-        )
-
     @classmethod
-    def load(cls, path):
+    def load(cls, path, ckpt_stem=None):
         """reload object after saving to file with .save()
 
         Args:
             path: path to file saved using .save()
+            ckpt_stem: path or URL containing checkpoint files for all ensembled models
+                (pass a local path if you have already downloaded the checkpoints; if None,
+                will check if present in current directory otherwise download from GitHub)
 
         Returns:
             new HawkEars instance
 
-        Note: Note that if you used pickle=True when saving, the model object might not load properly
-        across different versions of OpenSoundscape.
+        Note: Note that if you used pickle=True when saving, the model object
+        might not load properly across different versions of OpenSoundscape.
+
+        Note: modifications to preprocessor are not retained when
+        saving/loading, unless .pickle format is used
         """
         loaded_content = torch.load(path)
 
@@ -313,14 +326,58 @@ class HawkEars(CNN):
 
         if isinstance(loaded_content, dict):
             # initialize with random weights is not currently supported, so init as normal
-            model = cls()
+            # from checkpoints (this provides the correct architectures)
+            model = cls(ckpt_stem=ckpt_stem)
+            # update all classifier heads based on the class list
+            model.change_classes(loaded_content["classes"])
             # load up the weights and instantiate from dictionary keys
-            # includes preprocessing parameters and settings
+            # including the weights of custom classifier heads
             state_dict = loaded_content.pop("weights")
-
-            # load weights from checkpoint
             model.network.load_state_dict(state_dict)
         else:
             model = loaded_content  # entire pickled object, not dictionary
 
         return model
+
+    @property
+    def ensemble_list(self):
+        return [
+            self.network.model_0,
+            self.network.model_1,
+            self.network.model_2,
+            self.network.model_3,
+            self.network.model_4,
+        ]
+
+    def recreate_clf(self):
+        # use appropriate output dimensions (`len(self.classes)`) for each sub-model's fc layer
+        for submodel in self.ensemble_list:
+            # initializes new FC layer with random weights
+            submodel.head.fc = torch.nn.Linear(2048, len(self.classes))
+        self.network.to(self.device)
+
+    @property
+    def classifier_params(self):
+        """return list of parameters for the classification layers from all ensembled models"""
+        clf_params = []
+        for submodel in self.ensemble_list:
+            # initializes new FC layer with random weights
+            clf_params.extend(submodel.head.fc.parameters())
+        return clf_params
+
+    def change_classes(self, new_classes):
+        """modify the classification heads of all ensembled models to match new class list
+
+        Args:
+            new_classes: list of class names to use for classification
+        Effects:
+            - updates self.classes and torch metrics to match new classes
+            - changes output layer sizes to match len(classes)
+            - initializes fc layers of each ensembled sub-model with random weights
+            - self.class_codes is set to None, as original HawkEars alpha codes no
+                longer match self.classes
+        """
+        self.classes = new_classes
+        self.class_codes = None  # alpha codes no longer known
+        self._init_torch_metrics()
+        self.recreate_clf()

@@ -3,12 +3,12 @@ import sys
 
 import pandas as pd
 
-from bioacoustics_model_zoo.rana_sierrae_cnn import rana_sierrae_cnn
+from bioacoustics_model_zoo.rana_sierrae_cnn import RanaSierraeCNN
 
 
 @pytest.fixture
 def model():
-    return rana_sierrae_cnn()
+    return RanaSierraeCNN()
 
 
 @pytest.fixture

@@ -4,6 +4,51 @@ import numpy as np
 from pathlib import Path
 
 
+def register_model(cls):
+    """Register a model class to be visible in bmz.list_models()
+
+    Args:
+        cls: class to register
+    """
+
+
+global BMZ_MODEL_LIST
+BMZ_MODEL_LIST = []
+
+
+def list_models():
+    """return list of available action function keyword strings
+    (can be used to initialize Action class)
+    """
+    return BMZ_MODEL_LIST
+
+
+def describe_models():
+    """return short description of each available model"""
+    descriptions = {}
+    for model in BMZ_MODEL_LIST:
+        if model.__doc__ is not None:
+            txt = model.__doc__.split("\n")[0]
+        elif model.__init__.__doc__ is not None:
+            txt = model.__init__.__doc__.split("\n")[0]
+        else:
+            txt = "no description"
+        descriptions[model.__name__] = txt
+
+    return descriptions
+
+
+def register_bmz_model(model_cls):
+    """add class to BMZ_MODEL_LIST
+
+    this allows us to recreate the class when loading saved model file with load_model()
+    """
+    # register the model in dictionary
+    BMZ_MODEL_LIST.append(model_cls)
+    # return the function
+    return model_cls
+
+
 def download_github_file(url, save_dir=".", verbose=True, redownload_existing=False):
     save_path = Path(save_dir) / Path(url).name
     if Path(save_path).exists() and not redownload_existing:
