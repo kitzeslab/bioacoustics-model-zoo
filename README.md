@@ -31,7 +31,7 @@ pip install timm torchaudio
 or if using BirdNET you will need to 
 
 ```
-pip install tensorflow tf-hub
+pip install tensorflow tensorflow-hub
 ```
 
 > Note that tensorflow installation sometimes requires careful attention to version numbers, see [this section below](#tensorflow-installation-in-python-environment)
