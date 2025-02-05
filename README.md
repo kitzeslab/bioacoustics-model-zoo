@@ -80,16 +80,18 @@ scores
 
 To contribute a model to the model zoo, email `sam.lapp@pitt.edu` or add a model yourself:
 - fork this repository ([help](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo))
-- add a .py module in the bioacoustics_model_zoo subfolder implementing a class that instantiates your model object
-  - your trained model object or weights will not be saved in this repository. The class should instead load the pre-trained weights from a public url. For an example:
-https://github.com/kitzeslab/bioacoustics-model-zoo/blob/593fe39a9e0f712c04d6e20262af70aeac20be75/hubconf.py#L53-L57
-  - include a thorough docstring describing the model's purpose, how it was trained, and how to use it
+- add a `.py` module in the bioacoustics_model_zoo subfolder implementing a class that instantiates your model object
+  - implement the predict() and embed() methods with an API matching the other models in the model zoo
+  - optionally implement train() method
+  - Note: if you have a pytorch model, you may be able to simply subclass opensoundscape.CNN without needing to override these methods
+  - in the docstring, provide an example of use
   - in the docstring, also include a suggested citation for others using the model
-- add a line to `hubconf.py` importing your class, eg `from bioacoustics_model_zoo.birdnet import BirdNET`
+  - decorate your class with `@register_bmz_model` 
+- add an import statement in `__init__.py` to import your model class into the top-level package API (`from bioacoustics_model_zoo.new_model import NewModel`)
 - add your model to the Model List below in this document, with example usage
 - submit a pull request ([GitHub's help page](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork))
 
-  
+Check out any of the existing models for examples of how to complete these steps. In particular, pick the current model class most similar to yours (pytorch vs tensorflow) as a starting point. 
 
 # Model list
 
