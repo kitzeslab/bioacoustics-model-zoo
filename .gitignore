@@ -9,3 +9,5 @@ bioacoustics_model_zoo/*.ckpt
 bioacoustics_model_zoo/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt
 bioacoustics_model_zoo/BirdNET_GLOBAL_6K_V2.4_Model_FP16.tflite
 bioacoustics_model_zoo/birdset/configs
+bioacoustics_model_zoo/models--DBD-research-group--ConvNeXT-Base-BirdSet-XCL/
+.locks
