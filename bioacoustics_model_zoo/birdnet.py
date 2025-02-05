@@ -71,8 +71,8 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
 
         Example:
         ```
-        import torch
-        m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET',trust_repo=True)
+        import bioacoustics_model_zoo as bmz
+        m=bmz.BirdNET()
         m.predict(['test.wav'],batch_size=64) # returns dataframe of per-class scores
         m.embed(['test.wav']) # returns dataframe of embeddings
         ```
