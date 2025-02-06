@@ -59,7 +59,7 @@ def download_github_file(url, save_dir=".", verbose=True, redownload_existing=Fa
     # format for github download url:
     # url = f"https://raw.githubusercontent.com/{github_username}/{github_repo}/master/{file_path}"
     # headers = {"Authorization": f"token {github_token}"}
-    url = url.replace("/blob/", "/raw/")  # direct download link
+    url = str(url).replace("/blob/", "/raw/")  # direct download link
     response = requests.get(url)  # , headers=headers)
 
     if response.status_code == 200:
