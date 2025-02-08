@@ -214,7 +214,7 @@ class HawkEars(CNN):
                     ckpt_path, redownload_existing=force_reload
                 )
             else:
-                assert ckpt_path.exists(), f"Checkpoint not found at {ckpt_path}"
+                assert Path(ckpt_path).exists(), f"Checkpoint not found at {ckpt_path}"
                 model_path = ckpt_path
             model_path = str(Path(model_path).resolve())  # get absolute path as string
             assert Path(model_path).exists(), f"Model path {model_path} does not exist"
