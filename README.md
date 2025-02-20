@@ -14,6 +14,7 @@ conda create -n bmz python=3.10
 2. Install the repository from GitHub as a package. For instance, to install the `bioacousticsmodel-zoo` in a python environment (e.g. conda environment) using pip:
 
 ```
+pip install opensoundscape
 pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo
 ```
 
