@@ -1,0 +1,50 @@
+# @package _global_
+task_name: "debug"
+train: True
+# callbacks: null
+#logger: null
+defaults:
+  - override /module: multilabel.yaml
+  - override /module/network: efficientnet.yaml
+  - override /datamodule: HSN.yaml
+#  - override /datamodule/transforms/waveform_augmentations: none.yaml
+#  - override /datamodule/transforms/spectrogram_augmentations: none.yaml
+
+extras: 
+  ignore_warnings: False
+
+hydra: 
+  job_logging: 
+    root:
+      level: DEBUG
+
+trainer: 
+  max_epochs: 1
+  accelerator: gpu
+  devices: 1
+  detect_anomaly: True
+  fast_dev_run: False
+
+module:
+  network:
+    torch_compile: False
+
+datamodule: 
+  loaders:
+    train: 
+      batch_size: 2
+      num_workers: 1
+      pin_memory: False
+    valid: 
+      batch_size: 2
+      num_workers: 1 
+      pin_memory: False
+    test:
+      batch_size: 2
+      num_workers: 1 
+      pin_memory: False
+  dataset:
+    subset: 200
+    n_workers: 1
+
+  #transforms: bird_default.yaml

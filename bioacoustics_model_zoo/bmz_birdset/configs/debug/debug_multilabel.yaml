@@ -1,0 +1,76 @@
+# @package _global_
+task_name: debug
+
+defaults:
+  - override /module: multilabel.yaml
+  - override /module/network: ast.yaml
+  - override /datamodule: UHH_inf.yaml
+  #- override /callbacks: default.yaml 
+  - override /trainer: single_gpu.yaml
+ # - override /datamodule/transforms: bird_default_multilabel.yaml
+  - override /datamodule/transforms: inference_default.yaml
+  - override /callbacks: cluster.yaml
+  - override /datamodule/transforms/spectrogram_augmentations: none.yaml
+  - override /datamodule/transforms/waveform_augmentations: none.yaml
+
+#ckpt_path: "/home/lrauch/projects/BirdSet/birdset/output/train/runs/xenocanto_m_withoutnd/eat/2024-01-23_145247/checkpoints"
+test: True
+
+extras: 
+  ignore_warnings: False
+
+hydra: 
+  job_logging: 
+    root:
+      level: DEBUG
+
+seed: 4
+
+module:
+  network:
+    # model: 
+    #   checkpoint: /home/lrauch/mnt/train/runs/XCM/efficientnet/2024-02-27_175354/callback_checkpoints/efficientnet_XCM_146.ckpt
+    model:
+    #   checkpoint: /home/lrauch/EAT-base_epoch30.pt
+      local_checkpoint: /home/lrauch/mnt/train/runs/XCM/ast/2024-04-03_133040/callback_checkpoints/last.ckpt
+      pretrain_info:
+        hf_path: DBD-research-group/BirdSet
+        hf_name: UHH
+        hf_pretrain_name: XCM
+
+
+trainer: 
+  max_epochs: 1
+  accelerator: gpu
+  devices: 1
+  detect_anomaly: True
+  fast_dev_run: False
+
+datamodule:
+  transforms:
+    preprocessing:
+      resizer:
+        target_width: 1_024
+  
+  loaders:
+    train: 
+      batch_size: 3
+      num_workers: 1
+      shuffle: True
+      pin_memory: False
+    valid: 
+      batch_size: 3
+      num_workers: 1
+      pin_memory: False
+    test:
+      batch_size: 3
+      num_workers: 1
+      pin_memory: False
+
+tags: ["debug"]
+
+# logger:
+#   wandb:
+#     tags: ${tags}
+#     group: "high_sierras_aug"
+#     mode: online

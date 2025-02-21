@@ -19,6 +19,11 @@ try:
 except:
     torchaudio = None
 
+try:
+    import birdset
+except:
+    birdset = None
+
 # import with leading underscore to hide from torch.hub.list()
 from opensoundscape import CNN as _CNN
 
@@ -84,6 +89,30 @@ if timm is None or torchaudio is None:
 else:
     from bioacoustics_model_zoo.hawkears.hawkears import HawkEars
     from bioacoustics_model_zoo import hawkears
+
+
+class MissingBirdSetConvNeXTDependency:
+    """BirdSetConvNeXT dependency missing!
+
+    try:
+    pip install -e git+https://github.com/DBD-research-group/BirdSet.git#egg=birdset
+    """
+
+    def __init__(self, *args, **kwargs):
+        raise ImportError(
+            "timm and torchaudio packages are required to use this model and at least one was not found in the environment"
+        )
+
+
+if birdset is None:
+
+    @register_bmz_model
+    class BirdSetConvNeXT(MissingBirdSetConvNeXTDependency):
+        pass
+
+else:
+    from bioacoustics_model_zoo.bmz_birdset.bmz_birdset import BirdSetConvNeXT
+
 
 from bioacoustics_model_zoo import rana_sierrae_cnn
 from bioacoustics_model_zoo.rana_sierrae_cnn import RanaSierraeCNN

@@ -197,6 +197,33 @@ m = bmz.HawkEars()
 m.train(train_df,val_df,epochs=10,batch_size=64,num_workers=4)
 ```
 
+### [BirdSet ConvNext](https://github.com/DBD-research-group/BirdSet)
+
+Open-source PyTorch model trained on Xeno Canto (global bird species classification)
+
+Environment set up:
+```bash
+conda create -n birdset python=3.10
+conda activate birdset
+pip install git+https://github.com/sammlapp/BirdSet.git#egg=birdset
+pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo.git@birdset
+pip install git+https://github.com/kitzeslab/opensoundscape.git@develop
+pip install –upgrade torch torchaudio torchvision
+```
+
+Example: 
+
+```python
+import bioacoustics_model_zoo as bmz
+m = bmz.BirdSetConvNeXT()
+m.predict(['test.wav']) # returns dataframe of per-class scores
+m.embed(['test.wav']) # returns dataframe of embeddings
+
+# training is equivalent to training the CNN class in OpenSoundscape
+m.change_classes(my_custom_class_list) #modifies the output layer to match n classes
+m.train(train_df,val_df,...) 
+```
+
 ### [MixIT Bird SeparationModel](https://github.com/google-research/sound-separation/blob/master/models/bird_mixit/README.md)
 
 Separate audio into channels potentially representing separate sources.
