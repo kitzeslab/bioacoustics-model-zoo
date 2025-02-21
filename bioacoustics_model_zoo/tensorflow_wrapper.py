@@ -151,7 +151,8 @@ class TensorFlowModelWithPytorchClassifier(CNN):
 
         Example:
         ```
-        model = torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'BirdNET')
+        import bioacoustics_model_zoo as bmz
+        model = bmz.BirdNET()
         model.initialize_custom_classifier(hidden_layer_sizes=(256,), classes=["A", "B", "C"])
         model.train(train_df, validation_df)
         model.predict(validation_df)

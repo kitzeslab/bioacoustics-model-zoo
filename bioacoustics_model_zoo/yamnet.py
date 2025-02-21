@@ -58,8 +58,8 @@ class YAMNet(BaseClassifier):
 
         Example:
         ```
-        import torch
-        m=torch.hub.load('kitzeslab/bioacoustics-model-zoo', 'YAMNet',trust_repo=True)
+        import bioacoustics_model_zoo as bmz
+        m=bmz.YAMNet()
         m.predict(['test.wav']) # returns dataframe of per-class scores
         m.embed(['test.wav']) # returns dataframe of embeddings
         m.generate_logmelspecs(['test.wav']) # returns np.array of logmelspecs

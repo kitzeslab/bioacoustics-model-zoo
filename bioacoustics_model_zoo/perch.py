@@ -63,20 +63,15 @@ class Perch(TensorFlowModelWithPytorchClassifier):
 
         Example 1: download from TFHub and generate logits and embeddings
         ```
-        import torch
-        model=torch.hub.load('kitzeslab/bioacoustics_model_zoo', 'Perch',trust_repo=True)
+        import bioacoustics_model_zoo as bm
+        model=bmz.Perch()
         predictions = model.predict(['test.wav']) #predict on the model's classes
         embeddings = model.embed(['test.wav']) #generate embeddings on each 5 sec of audio
         ```
 
         Example 2: loading from local folder
         ```
-        m = torch.hub.load(
-            'kitzeslab/bioacoustics-model-zoo',
-            'Perch',
-            url='/path/to/perch_folder/',
-            trust_repo=True
-        )
+        m = bmz.Perch(path='/path/to/perch_folder/',)
         """
         # only require tensorflow and tensorflow_hub if/when this class is used
         try:

@@ -3,33 +3,18 @@ Pre-trained models for bioacoustic classification tasks
 
 ## Set up / Installation
 To use the bioacoustics model zoo: 
-1. create a python environment (3.9-3.11 supported) using conda or your preferred package manager
 
-2. install the required packages: download the requirements.txt file, then run `pip install -r /path/to/requirements.txt`
+1. Create a python environment (3.9-3.11 supported) using conda or your preferred package manager
 
-3. Use the models in any of the following ways:
-
-#### Use the torch.hub API to access models:
-
-```python
-import torch
-model = torch.hub.load('kitzeslab/bioacoustics-model-zoo','Perch')
+For example, using conda:
+```
+conda create -n bmz python=3.10
 ```
 
-#### Use the opensoundscape API:
-
-```python
-from opensoundscape.ml import bioacoustics_model_zoo as bmz
-model = bmz.load('Perch')
-```
-
-#### Install this repository as a Python package, 
-Installing as a package may be necessary to overcome issues with num_workers>0, per this
-[issue](https://github.com/pytorch/hub/issues/353).
-
-For example, you can install the repo as a package in a python environment using pip:
+2. Install the repository from GitHub as a package. For instance, to install the `bioacousticsmodel-zoo` in a python environment (e.g. conda environment) using pip:
 
 ```
+pip install opensoundscape
 pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo
 ```
 
@@ -38,11 +23,30 @@ If you want to intall a specific branch or release of the model zoo, for instanc
 pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@0.11.0
 ```
 
+3. Install any additional dependencies for the specific models you want to use. Additional dependencies for each model are noted in the Model List below. For example, if using HawkEars you will need to 
+
+```
+pip install timm torchaudio
+```
+
+or if using BirdNET you will need to 
+
+```
+pip install tensorflow tensorflow-hub
+```
+
+> Note that tensorflow installation sometimes requires careful attention to version numbers, see [this section below](#tensorflow-installation-in-python-environment)
+
 You can now use the package directly in python:
 ```
 import bioacoustics_model_zoo as bmz
 model = bmz.HawkEars()
+model.predict(audio_files) 
 ```
+
+See a description of each model and basic usage exmple below. Also see the transfer learning tutorials on OpenSoundscape.org for detailed advice on fine-tuning models from the Bioacoustics Model Zoo. 
+
+If you encounter an issue or a bug, or would like to request a new feature, make a new "Issue" on the [Github Issues page](https://github.com/kitzeslab/bioacoustics-model-zoo/issues). You can also reach out to Sam (`sam.lapp@pitt.edu`) for more specific inquiries. 
 
 # Basic usage
 
@@ -50,15 +54,15 @@ model = bmz.HawkEars()
 
 List available models in the GitHub repo [bioacoustics-model-zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/)
 ```
-import torch
-torch.hub.list('kitzeslab/bioacoustics-model-zoo')
+import bioacoustics_model_zoo as bm
+bmz.utils.list_models()
 ```
 
 ### Load: 
 
 Get a ready-to-use model object: choose from the models listed in the previous command
 ```
-model = torch.hub.load('kitzeslab/bioacoustics-model-zoo','rana_sierrae_cnn',trust_repo=True)
+model = bmz.BirdNET()
 ```
 
 ### Inference:
@@ -77,16 +81,18 @@ scores
 
 To contribute a model to the model zoo, email `sam.lapp@pitt.edu` or add a model yourself:
 - fork this repository ([help](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo))
-- add a .py module in the bioacoustics_model_zoo subfolder implementing a class that instantiates your model object
-  - your trained model object or weights will not be saved in this repository. The class should instead load the pre-trained weights from a public url. For an example:
-https://github.com/kitzeslab/bioacoustics-model-zoo/blob/593fe39a9e0f712c04d6e20262af70aeac20be75/hubconf.py#L53-L57
-  - include a thorough docstring describing the model's purpose, how it was trained, and how to use it
+- add a `.py` module in the bioacoustics_model_zoo subfolder implementing a class that instantiates your model object
+  - implement the predict() and embed() methods with an API matching the other models in the model zoo
+  - optionally implement train() method
+  - Note: if you have a pytorch model, you may be able to simply subclass opensoundscape.CNN without needing to override these methods
+  - in the docstring, provide an example of use
   - in the docstring, also include a suggested citation for others using the model
-- add a line to `hubconf.py` importing your class, eg `from bioacoustics_model_zoo.birdnet import BirdNET`
+  - decorate your class with `@register_bmz_model` 
+- add an import statement in `__init__.py` to import your model class into the top-level package API (`from bioacoustics_model_zoo.new_model import NewModel`)
 - add your model to the Model List below in this document, with example usage
 - submit a pull request ([GitHub's help page](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork))
 
-  
+Check out any of the existing models for examples of how to complete these steps. In particular, pick the current model class most similar to yours (pytorch vs tensorflow) as a starting point. 
 
 # Model list
 

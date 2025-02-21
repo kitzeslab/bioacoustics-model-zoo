@@ -17,7 +17,7 @@ from opensoundscape.ml.cnn import register_model_cls
 from opensoundscape.preprocess.actions import register_action_cls
 
 HAWKEARS_CKPT_URLS = {
-    "v0.1.0": "https://github.com/jhuus/HawkEars/raw/refs/tags/0.1.0/data/ckpt/",
+    "v0.1.0": "https://github.com/jhuus/HawkEars/raw/refs/tags/0.1.0/data/ckpt",
 }
 
 
@@ -177,11 +177,10 @@ class HawkEars(CNN):
         classes: list of class names ONLY if replacing classifier head with a custom classifier
             - if None (default), uses classes from pre-trained checkpoint
     Example:
-    ``` import torch
-    m=torch.hub.load('kitzeslab/bioacoustics-model-zoo',
-    'HawkEars',trust_repo=True) m.predict(['test.wav'],batch_size=64) # returns
-    dataframe of per-class scores m.embed(['test.wav']) # returns dataframe of
-    embeddings
+    ``` import bioacoustics_model_zoo as bmz
+    m=bmz.HawkEars()
+    m.predict(['test.wav'],batch_size=64) # returns dataframe of per-class scores
+    m.embed(['test.wav']) # returns dataframe of embeddings
     ```
     """
 
@@ -198,8 +197,10 @@ class HawkEars(CNN):
 
         if ckpt_stem is None:
             ckpt_stem = HAWKEARS_CKPT_URLS["v0.1.0"]
+        elif not str(ckpt_stem).startswith("http"):
+            ckpt_stem = Path(ckpt_stem).resolve()  # local path: convert to full path
 
-        all_checkpoints = [Path(".") / f"hgnet{i}.ckpt" for i in range(1, 6)]
+        all_checkpoints = [f"{ckpt_stem}/hgnet{i}.ckpt" for i in range(1, 6)]
         all_models = []
         class_codes = None
         classes = None
@@ -213,7 +214,7 @@ class HawkEars(CNN):
                     ckpt_path, redownload_existing=force_reload
                 )
             else:
-                assert ckpt_path.exists(), f"Checkpoint not found at {ckpt_path}"
+                assert Path(ckpt_path).exists(), f"Checkpoint not found at {ckpt_path}"
                 model_path = ckpt_path
             model_path = str(Path(model_path).resolve())  # get absolute path as string
             assert Path(model_path).exists(), f"Model path {model_path} does not exist"

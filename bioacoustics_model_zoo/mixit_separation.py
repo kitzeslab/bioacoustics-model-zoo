@@ -16,8 +16,12 @@ class SeparationModel(object):
     ):
         """Initializes "MixIt" Tensorflow audio separation model from local checkpoint
 
-        note: to use this class with torch.hub.load(), you must provide the
-        checkpoint='/path/to/downloaded/checkpoint'. To download the MixIt checkpoint,
+        To initialize the model, you must download the MixIt checkpoint and
+        provide the `checkpoint` argument
+        `checkpoint='/path/to/downloaded/checkpoint'`.
+        Note that ".data-00000-of-00001" or ".index" is not included
+
+        To download the MixIt checkpoint,
         run `gsutil -m cp -r gs://gresearch/sound_separation/bird_mixit_model_checkpoints .`
         or see instructions on the [MixIt Github repo](https://github.com/google-research/sound-separation/blob/master/models/bird_mixit/README.md)
 
@@ -44,14 +48,13 @@ class SeparationModel(object):
 
         Then, use the model in python:
         ```
-        import torch
+        import bioacoustics_model_zoo as bmz
         # provide the local path to the checkpoint when creating the object
-        model = torch.hub.load(
-            'kitzeslab/bioacoustics-model-zoo',
-            'SeparationModel',
+        model = bmz.SeparationModel(
             checkpoint='/path/to/bird_mixit_model_checkpoints/output_sources4/model.ckpt-3223090',
-            trust_repo=True
-        ) #creates 4 channels; use output_sources8 to separate into 8 channels
+        )
+        # Note: this checkpoint creates 4 channels;
+        # use .../output_sources8/... to separate into 8 channels
 
         # separate opensoundscape Audio object into 4 channels:
         # note that it seems to work best on 5 second segments

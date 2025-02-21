@@ -1,6 +1,6 @@
 import torch
-import utils
-from utils import register_bmz_model
+from bioacoustics_model_zoo import utils
+from bioacoustics_model_zoo.utils import register_bmz_model
 
 # handle optional dependencies
 try:
@@ -59,10 +59,10 @@ else:
     from bioacoustics_model_zoo.mixit_separation import SeparationModel
     from bioacoustics_model_zoo.yamnet import YAMNet
     from bioacoustics_model_zoo.perch import Perch
-    from . import birdnet
-    from . import mixit_separation
-    from . import yamnet
-    from . import perch
+    from bioacoustics_model_zoo import birdnet
+    from bioacoustics_model_zoo import mixit_separation
+    from bioacoustics_model_zoo import yamnet
+    from bioacoustics_model_zoo import perch
 
 
 # timm and torchaudio requirement
@@ -83,7 +83,7 @@ if timm is None or torchaudio is None:
 
 else:
     from bioacoustics_model_zoo.hawkears.hawkears import HawkEars
-    from . import hawkears
+    from bioacoustics_model_zoo import hawkears
 
-from . import rana_sierrae_cnn
-from .rana_sierrae_cnn import RanaSierraeCNN
+from bioacoustics_model_zoo import rana_sierrae_cnn
+from bioacoustics_model_zoo.rana_sierrae_cnn import RanaSierraeCNN
