@@ -128,15 +128,17 @@ class BirdSetConvNeXT(SpectrogramClassifier):
     def __init__(self):
         """BirdSet pretrained ConvNeXT model
 
-        by default loads weights of model trained on Xeno Canto full (XCL Dataset)
+                by default loads weights of model trained on Xeno Canto full (XCL Dataset)
 
-        to prepare an environment run:
-        ```
-        conda create -n birdset python=3.10
-        conda activate birdset
-        pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo.git
-        pip install opensoundscape
-        pip install git+https://github.com/sammlapp/BirdSet.git#egg=birdset
+                to prepare an environment run:
+                ```
+                conda create -n birdset python=3.10
+                conda activate birdset
+                pip install git+https://github.com/sammlapp/BirdSet.git#egg=birdset
+                pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo.git@birdset
+                pip install git+https://github.com/kitzeslab/opensoundscape.git@develop
+                pip install -–upgrade torch torchaudio torchvision
+
         ```
         """
 
