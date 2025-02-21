@@ -1,0 +1,21 @@
+#ESC50
+_target_: birdset.datamodule.esc50_datamodule.ESC50DataModule
+
+defaults:
+  - _self_
+  - transforms: esc_default.yaml
+  - loaders: default.yaml
+
+dataset:
+  data_dir: ${paths.dataset_path}
+  hf_path: ashraq/esc50
+  hf_name: esc50
+  seed: ${seed}
+  n_classes: 50
+  n_workers: 1
+  val_split: 0.2
+  task: ${module.task}
+  subset: null
+  sampling_rate: ${module.network.sampling_rate}
+  class_weights_loss: False
+  class_weights_sampler: null

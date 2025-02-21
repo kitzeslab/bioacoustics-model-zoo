@@ -19,6 +19,11 @@ try:
 except:
     torchaudio = None
 
+try:
+    import birdset
+except:
+    birdset = None
+
 # import with leading underscore to hide from torch.hub.list()
 from opensoundscape import CNN as _CNN
 
@@ -90,8 +95,7 @@ class MissingBirdSetConvNeXTDependency:
     """BirdSetConvNeXT dependency missing!
 
     try:
-    pip install -e git+https://github.com/sammlapp/BirdSet.git#egg=birdset
-    pip install datasets transformers
+    pip install -e git+https://github.com/DBD-research-group/BirdSet.git#egg=birdset
     """
 
     def __init__(self, *args, **kwargs):

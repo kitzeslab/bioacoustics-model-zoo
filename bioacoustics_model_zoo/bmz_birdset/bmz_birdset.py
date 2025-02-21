@@ -1,5 +1,5 @@
 # install:
-# pip install -e git+https://github.com/sammlapp/BirdSet.git
+# pip install -e git+https://github.com/DBD-research-group/BirdSet.git#egg=birdset
 # pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo.git
 # pip install datasets transformers opensoundscape==0.11.0
 
@@ -18,11 +18,8 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 # from birdset.datamodule.components.transforms import BirdSetTransformsWrapper
-import librosa
 from transformers import ConvNextForImageClassification
 import torch
-from pathlib import Path
-
 
 # note that I copied the entire "configs" folder from the birdset repo
 # to the current working directory
@@ -63,8 +60,9 @@ class BirdSetAction(BaseAction):
             "audio": [{"array": sample.data.samples}],
             "labels": torch.tensor(sample.labels.values).unsqueeze(1),
         }
-
+        # run the transformation
         labels_values_dict = self.birdset_transform(batch)
+
         sample.data = labels_values_dict["input_values"].squeeze(0)
         if len(labels_values_dict["labels"]) > 0:
             sample.labels = pd.Series(
@@ -137,10 +135,11 @@ class BirdSetConvNeXT(SpectrogramClassifier):
         conda create -n birdset python=3.10
         conda activate birdset
         pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo.git
-        pip install opensoundscape git+https://github.com/sammlapp/BirdSet.git#egg=birdset
-        #pip install datasets transformers
+        pip install opensoundscape
+        pip install git+https://github.com/sammlapp/BirdSet.git#egg=birdset
         ```
         """
+
         # for no augmentation: self.preprocessor.pipeline.birdset_transform.birdset_transform.mode = "predict"
         model = ConvNextForImageClassificationLogits.from_pretrained(
             "DBD-research-group/ConvNeXT-Base-BirdSet-XCL",

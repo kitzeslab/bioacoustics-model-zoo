@@ -1,0 +1,31 @@
+#xcm
+_target_: birdset.datamodule.pretrain_datamodule.PretrainDataModule
+
+defaults: 
+  - _self_
+  - transforms: bird_default.yaml
+  - loaders: default.yaml
+  - mapper: xc_bambird_mapper.yaml
+
+dataset:
+  data_dir: ${paths.dataset_path}
+  hf_path: DBD-research-group/BirdSet
+  hf_name: XCM
+  seed: ${seed}
+  n_workers: 5
+  val_split: null
+  task: ${module.task}
+  subset: null
+  sampling_rate: ${module.network.sampling_rate}
+  class_weights_loss: null
+  class_weights_sampler: null
+  classlimit: 500
+  eventlimit: 5
+  direct_fingerprint: null
+
+
+
+
+
+
+

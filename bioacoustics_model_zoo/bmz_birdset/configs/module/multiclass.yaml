@@ -1,0 +1,27 @@
+_target_: birdset.modules.base_module.BaseModule
+
+defaults:
+  - _self_
+  - network: efficientnet.yaml
+  
+task: multiclass
+num_gpus: ${trainer.devices}
+
+optimizer:
+  _target_: torch.optim.AdamW
+  _partial_: true
+  lr: 1e-5
+  weight_decay: 0.01
+
+loss:
+  _target_: torch.nn.CrossEntropyLoss
+
+metrics:
+  _target_: birdset.configs.module_configs.MulticlassMetricsConfig
+  num_labels: ${datamodule.dataset.n_classes}
+  
+
+output_activation: 
+  _target_: "torch.softmax"
+  _partial_: true
+  dim: 1

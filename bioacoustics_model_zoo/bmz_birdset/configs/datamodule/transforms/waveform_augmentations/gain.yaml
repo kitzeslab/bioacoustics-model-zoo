@@ -1,0 +1,5 @@
+gain:
+  _target_: torch_audiomentations.Gain
+  p: 0.2
+  min_gain_in_db: -18
+  max_gain_in_db: 6

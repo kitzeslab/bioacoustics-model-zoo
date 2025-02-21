@@ -1,0 +1,15 @@
+ignore_warnings: True
+
+enforce_tags: False
+
+print_config: True
+
+plugins: null
+
+state_dict_saving_params: 
+  symbols: 6
+  exceptions: ["loss"]
+
+dump_metrics: True
+
+
