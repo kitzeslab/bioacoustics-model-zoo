@@ -149,7 +149,7 @@ class BirdSetConvNeXT(SpectrogramClassifier):
             ignore_mismatched_sizes=True,
         )
         dataset_meta = datasets.load_dataset_builder(
-            "dbd-research-group/BirdSet", "XCL"
+            "DBD-research-group/BirdSet", "XCL"
         )
         classes = dataset_meta.info.features["ebird_code"]
         class_list = np.array(classes.names)
