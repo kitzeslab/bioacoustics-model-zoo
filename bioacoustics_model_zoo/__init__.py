@@ -100,7 +100,11 @@ class MissingBirdSetConvNeXTDependency:
 
     def __init__(self, *args, **kwargs):
         raise ImportError(
-            "timm and torchaudio packages are required to use this model and at least one was not found in the environment"
+            """BirdSetConvNeXT dependency missing!
+
+            try:
+            pip install -e git+https://github.com/DBD-research-group/BirdSet.git#egg=birdset
+            """
         )
 
 

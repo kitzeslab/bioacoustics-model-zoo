@@ -148,9 +148,14 @@ class BirdSetConvNeXT(SpectrogramClassifier):
             cache_dir=".",
             ignore_mismatched_sizes=True,
         )
-        dataset_meta = datasets.load_dataset_builder(
-            "DBD-research-group/BirdSet", "XCL"
-        )
+        try:
+            dataset_meta = datasets.load_dataset_builder(
+                "DBD-research-group/BirdSet", "XCL"
+            )
+        except ModuleNotFoundError:
+            dataset_meta = datasets.load_dataset_builder(
+                "dbd-research-group/BirdSet", "XCL"
+            )
         classes = dataset_meta.info.features["ebird_code"]
         class_list = np.array(classes.names)
 
