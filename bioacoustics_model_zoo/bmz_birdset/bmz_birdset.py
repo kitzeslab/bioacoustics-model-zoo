@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from glob import glob
 from pathlib import Path
+import json
 
 import os
 import hydra
@@ -20,6 +21,9 @@ from omegaconf import DictConfig, OmegaConf
 # from birdset.datamodule.components.transforms import BirdSetTransformsWrapper
 from transformers import ConvNextForImageClassification
 import torch
+
+from bioacoustics_model_zoo.utils import download_github_file
+
 
 # note that I copied the entire "configs" folder from the birdset repo
 # to the current working directory
@@ -148,16 +152,16 @@ class BirdSetConvNeXT(SpectrogramClassifier):
             cache_dir=".",
             ignore_mismatched_sizes=True,
         )
-        try:
-            dataset_meta = datasets.load_dataset_builder(
-                "DBD-research-group/BirdSet", "XCL"
-            )
-        except ModuleNotFoundError:
-            dataset_meta = datasets.load_dataset_builder(
-                "dbd-research-group/BirdSet", "XCL"
-            )
-        classes = dataset_meta.info.features["ebird_code"]
-        class_list = np.array(classes.names)
+
+        # download the class list from the BirdSet repo
+        # note that this class list seems to use the Birdnet 2022 taxonomy
+        # use name_conversions github repo to convert between these codes and common/scientific names
+        download_github_file(
+            "https://github.com/DBD-research-group/BirdSet/blob/66fbd9c3f40a201a80d149b0c738ea1ebe04edcb/resources/ebird_codes/XCL_ebird_codes.json"
+        )
+        with open("XCL_ebird_codes.json") as f:
+            ebird_codes = json.load(f)
+        class_list = list(ebird_codes["label2id"].keys())
 
         super().__init__(model, classes=class_list, sample_duration=5)
 
