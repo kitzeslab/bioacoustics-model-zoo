@@ -1,5 +1,6 @@
 import torch
 from bioacoustics_model_zoo import utils
+from bioacoustics_model_zoo.utils import list_models, describe_models, BMZ_MODEL_LIST
 from bioacoustics_model_zoo.utils import register_bmz_model
 
 # handle optional dependencies
@@ -20,9 +21,9 @@ except:
     torchaudio = None
 
 try:
-    import birdset
+    import transformers
 except:
-    birdset = None
+    transformers = None
 
 # import with leading underscore to hide from torch.hub.list()
 from opensoundscape import CNN as _CNN
@@ -91,11 +92,11 @@ else:
     from bioacoustics_model_zoo import hawkears
 
 
-class MissingBirdSetConvNeXTDependency:
+class MissingBirdSetDependency:
     """BirdSetConvNeXT dependency missing!
 
     try:
-    pip install -e git+https://github.com/DBD-research-group/BirdSet.git#egg=birdset
+    pip install torch torchaudio torchvision transformers
     """
 
     def __init__(self, *args, **kwargs):
@@ -103,20 +104,32 @@ class MissingBirdSetConvNeXTDependency:
             """BirdSetConvNeXT dependency missing!
 
             try:
-            pip install -e git+https://github.com/DBD-research-group/BirdSet.git#egg=birdset
+            pip install torch torchaudio torchvision transformers
             """
         )
 
 
-if birdset is None:
+if transformers is None or torchaudio is None:
 
     @register_bmz_model
-    class BirdSetConvNeXT(MissingBirdSetConvNeXTDependency):
+    class BirdSetConvNeXT(MissingBirdSetDependency):
+        pass
+
+    @register_bmz_model
+    class BirdSetEfficientNetB1(MissingBirdSetDependency):
         pass
 
 else:
-    from bioacoustics_model_zoo.bmz_birdset.bmz_birdset import BirdSetConvNeXT
-
+    from bioacoustics_model_zoo import bmz_birdset
+    from bioacoustics_model_zoo.bmz_birdset import (
+        bmz_birdset_convnext,
+        bmz_birdset_efficientnetB1,
+        birdset_preprocessing,
+    )
+    from bioacoustics_model_zoo.bmz_birdset.bmz_birdset_convnext import BirdSetConvNeXT
+    from bioacoustics_model_zoo.bmz_birdset.bmz_birdset_efficientnetB1 import (
+        BirdSetEfficientNetB1,
+    )
 
 from bioacoustics_model_zoo import rana_sierrae_cnn
 from bioacoustics_model_zoo.rana_sierrae_cnn import RanaSierraeCNN

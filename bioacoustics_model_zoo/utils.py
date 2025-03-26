@@ -12,15 +12,13 @@ def register_model(cls):
     """
 
 
-global BMZ_MODEL_LIST
 BMZ_MODEL_LIST = []
 
 
 def list_models():
-    """return list of available action function keyword strings
-    (can be used to initialize Action class)
-    """
-    return BMZ_MODEL_LIST
+    """return dictionary of available model names and classes"""
+    global BMZ_MODEL_LIST
+    return {c.__name__: c for c in BMZ_MODEL_LIST}
 
 
 def describe_models():
