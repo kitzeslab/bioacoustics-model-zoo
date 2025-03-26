@@ -26,14 +26,21 @@ pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@0.11.0
 3. Install any additional dependencies for the specific models you want to use. Additional dependencies for each model are noted in the Model List below. For example, if using HawkEars you will need to 
 
 ```
-pip install timm torchaudio
+pip install timm torch torchvision torchaudio
 ```
 
-or if using BirdNET you will need to 
+for BirdSet models, use
+
+```
+pip install torch torchvision torchaudio transformers
+```
+
+If using TensorFlow models (e.g. BirdNET or Perch) you will need to 
 
 ```
 pip install tensorflow tensorflow-hub
 ```
+
 
 > Note that tensorflow installation sometimes requires careful attention to version numbers, see [this section below](#tensorflow-installation-in-python-environment)
 
@@ -55,7 +62,10 @@ If you encounter an issue or a bug, or would like to request a new feature, make
 List available models in the GitHub repo [bioacoustics-model-zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/)
 ```
 import bioacoustics_model_zoo as bm
-bmz.utils.list_models()
+bmz.list_models() 
+
+# or, for short textual descriptions: 
+bmz.describe_models()
 ```
 
 ### Load: 
@@ -197,32 +207,53 @@ m = bmz.HawkEars()
 m.train(train_df,val_df,epochs=10,batch_size=64,num_workers=4)
 ```
 
-### [BirdSet ConvNext](https://github.com/DBD-research-group/BirdSet)
+### [BirdSet ConvNeXT](https://github.com/DBD-research-group/BirdSet)
 
 Open-source PyTorch model trained on Xeno Canto (global bird species classification)
+
+> Rauch, Lukas, et al. "Birdset: A multi-task benchmark for classification in avian bioacoustics." arXiv e-prints (2024): arXiv-2403.
+
 
 Environment set up:
 ```bash
 conda create -n birdset python=3.10
 conda activate birdset
-pip install git+https://github.com/sammlapp/BirdSet.git#egg=birdset
-pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo.git@birdset
-pip install git+https://github.com/kitzeslab/opensoundscape.git@develop
-pip install –upgrade torch torchaudio torchvision
+pip install opensoundscape transformers torch torchvision torchaudio
 ```
 
-Example: 
-
-```python
+Example: predict and embed:
+```
 import bioacoustics_model_zoo as bmz
-m = bmz.BirdSetConvNeXT()
-m.predict(['test.wav']) # returns dataframe of per-class scores
+m=bmz.BirdSetConvNeXT()
+m.predict(['test.wav'],batch_size=64) # returns dataframe of per-class scores
 m.embed(['test.wav']) # returns dataframe of embeddings
-
-# training is equivalent to training the CNN class in OpenSoundscape
-m.change_classes(my_custom_class_list) #modifies the output layer to match n classes
-m.train(train_df,val_df,...) 
 ```
+
+Example: train on different set of classes (see OpenSoundscape tutorials for details on training)
+```
+import bioacoustics_model_zoo as bmz
+import pandas as pd
+
+# load pre-trained network and change output classes
+m=bmz.BirdSetConvNeXT()
+m.change_classes(['crazy_zebra_grunt','screaming_penguin'])
+
+# optionally, freeze feature extractor (only train final layer)
+m.freeze_feature_extractor()
+
+# load one-hot labels and train (index: (file,start_time,end_time))
+train_df = pd.read_csv('train_labels.csv',index_col=[0,1,2])
+val_df = pd.read_csv('val_labels.csv',index_col=[0,1,2])
+m.train(train_df, val_df,batch_size=128, num_workers=8)
+```
+
+### [BirdSet EfficientNetB1](https://github.com/DBD-research-group/BirdSet)
+
+Open-source PyTorch model trained on Xeno Canto (global bird species classification)
+
+> Rauch, Lukas, et al. "Birdset: A multi-task benchmark for classification in avian bioacoustics." arXiv e-prints (2024): arXiv-2403.
+
+Environment set up and examples: see BirdSet ConvNeXT, using `m=bmz.BirdSetEfficientNetB1()` 
 
 ### [MixIT Bird SeparationModel](https://github.com/google-research/sound-separation/blob/master/models/bird_mixit/README.md)
 

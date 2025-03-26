@@ -54,6 +54,32 @@ class BirdSetConvNeXT(SpectrogramClassifier):
 
         Implements standard api: .train(), .predict(), .embed(), .generate_cams(),
         .generate_samples()
+
+        Example: predict and embed:
+        ```
+        import bioacoustics_model_zoo as bmz
+        m=bmz.BirdSetEfficientConvNeXT()
+        m.predict(['test.wav'],batch_size=64) # returns dataframe of per-class scores
+        m.embed(['test.wav']) # returns dataframe of embeddings
+        ```
+
+        Example: train on different set of classes (see OpenSoundscape tutorials for details on training)
+        ```
+        import bioacoustics_model_zoo as bmz
+        import pandas as pd
+
+        # load pre-trained network and change output classes
+        m=bmz.BirdSetEfficientConvNeXT()
+        m.change_classes(['crazy_zebra_grunt','screaming_penguin'])
+
+        # optionally, freeze feature extractor (only train final layer)
+        m.freeze_feature_extractor()
+
+        # load one-hot labels and train (index: (file,start_time,end_time))
+        train_df = pd.read_csv('train_labels.csv',index_col=[0,1,2])
+        val_df = pd.read_csv('val_labels.csv',index_col=[0,1,2])
+        m.train(train_df, val_df,batch_size=128, num_workers=8)
+        ```
         """
 
         model = ConvNextForImageClassificationLogits.from_pretrained(
@@ -61,6 +87,7 @@ class BirdSetConvNeXT(SpectrogramClassifier):
             cache_dir=".",
             ignore_mismatched_sizes=True,
         )
+
         # note that this class list seems to use the Birdnet 2022 taxonomy
         # use name_conversions github repo to convert between these codes and common/scientific names
         classes = [model.config.id2label[i] for i in range(model.num_labels)]
