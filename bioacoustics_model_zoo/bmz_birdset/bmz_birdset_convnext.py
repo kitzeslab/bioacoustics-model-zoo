@@ -16,7 +16,7 @@ class ConvNextBirdsetPreprocessor(BirdsetPreprocessor):
             overlay_df=overlay_df,
         )
         self.pipeline.to_spec.set(n_fft=1024, hop_length=320, power=2.0)
-        self.pipeline.to_mel.set(n_mels=128, n_stft=513)
+        self.pipeline.to_mel.set(n_mels=128, n_stft=513, sample_rate=32000)
         self.pipeline.power_to_db.set(top_db=80)
         self.pipeline.rescale.set(input_mean=-4.268, input_std=4.569)
 

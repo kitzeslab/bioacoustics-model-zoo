@@ -148,6 +148,9 @@ class BirdsetPreprocessor(BasePreprocessor):
                 "to_mel": Action(
                     spec_to_melspec,
                     is_augmentation=False,
+                    n_mels=128,
+                    n_stft=513,
+                    sample_rate=32000,
                 ),
                 "power_to_db": Action(
                     birdset_powertodb,

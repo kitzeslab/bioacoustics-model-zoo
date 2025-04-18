@@ -16,7 +16,7 @@ class EfficientnetBirdsetPreprocessor(BirdsetPreprocessor):
             overlay_df=overlay_df,
         )
         self.pipeline.to_spec.set(n_fft=2048, hop_length=256, power=2.0)
-        self.pipeline.to_mel.set(n_mels=256, n_stft=1025)
+        self.pipeline.to_mel.set(n_mels=256, n_stft=1025, sample_rate=32000)
         self.pipeline.power_to_db.set(top_db=80)
         self.pipeline.rescale.set(input_mean=-4.268, input_std=4.569)
 
