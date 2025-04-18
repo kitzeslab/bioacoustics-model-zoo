@@ -87,6 +87,26 @@ scores = model.predict([audio_file_path],activation_layer='softmax')
 scores
 ```
 
+### Converting to Pytorch Lightning + Opensoundscape
+
+```python
+import opensoundscape as opso # v0.12.0
+import bioacoustics_model_zoo as bmz
+from opensoundscape.ml.lightning import LightningSpectrogramModule
+
+# Load any Pytorch-based model from the model zoo (not TensorFlow models like Perch/BirdNET)
+model = bmz.BirdSetConvNeXT()
+
+#convert to Lightning model object with .predict_with_trainer, .fit_with_trainer methods
+# note: develop branch of opensoundscape now implements LightningSpectrogramModule.from_model(model)
+lm = LightningSpectrogramModule(
+    architecture=model.network, classes=model.classes, sample_duration=model.preprocessor.sample_duration
+)
+lm.preprocessor = model.preprocessor
+# lm.predict_with_trainer(opso.birds_path)
+# lm.fit_with_trainer(...)
+```
+
 # Contributing
 
 To contribute a model to the model zoo, email `sam.lapp@pitt.edu` or add a model yourself:
