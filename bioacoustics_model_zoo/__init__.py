@@ -11,6 +11,12 @@ except:
     tf = None
 
 try:
+    import ai_edge_litert
+except:
+    # allow use without tflite
+    ai_edge_litert = None
+
+try:
     import timm
 except:
     timm = None
@@ -40,13 +46,28 @@ class MissingTFDependency:
         )
 
 
-# tensorflow requirement
-if tf is None:
+class MissingTFLiteDependency:
+    """ai_edge_litert (tflite) dependency missing! try `pip install ai-edge-litert`"""
+
+    def __init__(self, *args, **kwargs):
+        raise ImportError(
+            "ai_edge_litert (tflite) is required to use this model and was not found in the environment"
+        )
+
+
+# tflite requirement
+if ai_edge_litert is None:
 
     @register_bmz_model
-    class BirdNET(MissingTFDependency):
+    class BirdNET(MissingTFLiteDependency):
 
         pass
+
+else:
+    from bioacoustics_model_zoo.birdnet import BirdNET
+
+# tensorflow requirement
+if tf is None:
 
     @register_bmz_model
     class SeparationModel(MissingTFDependency):
@@ -61,7 +82,6 @@ if tf is None:
         pass
 
 else:
-    from bioacoustics_model_zoo.birdnet import BirdNET
     from bioacoustics_model_zoo.mixit_separation import SeparationModel
     from bioacoustics_model_zoo.yamnet import YAMNet
     from bioacoustics_model_zoo.perch import Perch

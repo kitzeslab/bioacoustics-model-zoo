@@ -35,12 +35,16 @@ for BirdSet models, use
 pip install torch torchvision torchaudio transformers
 ```
 
-If using TensorFlow models (e.g. BirdNET or Perch) you will need to 
+If using TensorFlow models (e.g. Perch) you will need to 
 
 ```
 pip install tensorflow tensorflow-hub
 ```
 
+For BirdNET, install the new home of tflite:
+```
+pip install ai-edge-litert
+```
 
 > Note that tensorflow installation sometimes requires careful attention to version numbers, see [this section below](#tensorflow-installation-in-python-environment)
 
@@ -133,7 +137,7 @@ Classification and embedding model trained on a large set of annotated bird voca
 
 Additional required packages:
 
-`tensorflow`, `tensorflow_hub`
+`pip install ai-edge-litert`
 
 Example: 
 
