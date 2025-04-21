@@ -79,7 +79,7 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         """
         # only require tensorflow if/when this class is used
         try:
-            from tensorflow import lite as tflite
+            import ai_edge_litert.interpreter as tflite
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
                 "BirdNet requires tensorflow package to be installed. "
@@ -115,11 +115,10 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         model_path = str(Path(model_path).resolve())  # get absolute path as string
         assert Path(model_path).exists(), f"Model path {model_path} does not exist"
 
-        # load tflite model
         self.tf_model = tflite.Interpreter(
             model_path=model_path,
             num_threads=num_tflite_threads,
-            experimental_preserve_all_tensors=True,
+            experimental_op_resolver_type=tflite.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES,
         )
         self.tf_model.allocate_tensors()
 
