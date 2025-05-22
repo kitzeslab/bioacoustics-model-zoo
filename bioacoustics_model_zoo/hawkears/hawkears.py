@@ -290,7 +290,7 @@ class HawkEars(CNN):
     def freeze_feature_extractor(self):
         # the hgmodels all have .fc as the final classification layer
         # so we can freeze all except each model's .fc
-        return self.freeze_layers_except([m.fc for m in self.network.models])
+        return self.freeze_layers_except([m.head.fc for m in self.network.models])
 
     @classmethod
     def load(cls, path, ckpt_stem=None):
@@ -341,7 +341,7 @@ class HawkEars(CNN):
         return model
 
     @property
-    def ensemble_list(self):
+    def ensemble_list(self): #TODO: could this just be self.network.models instead?
         return [
             self.network.model_0,
             self.network.model_1,
