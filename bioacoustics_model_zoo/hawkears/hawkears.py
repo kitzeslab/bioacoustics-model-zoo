@@ -48,7 +48,7 @@ class HawkEarsSpec(BaseAction):
         self.cfg = cfg
 
         # set device (mps/cuda/cpu) to use for spectrogram creation
-        self.device = device
+        self.device = torch.device(device)
 
         self.linear_transform = torchaudio.transforms.Spectrogram(
             n_fft=2 * self.cfg.audio.win_length,
