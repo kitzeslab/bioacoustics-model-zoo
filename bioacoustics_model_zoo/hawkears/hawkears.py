@@ -9,6 +9,7 @@ from opensoundscape import Audio, CNN
 
 from bioacoustics_model_zoo.hawkears import hawkears_base_config
 from bioacoustics_model_zoo.hawkears.architecture_constructors import get_hgnet
+from bioacoustics_model_zoo.utils import download_cached_file, download_file
 import torchaudio
 
 import torch
@@ -17,7 +18,7 @@ from opensoundscape.ml.cnn import register_model_cls
 from opensoundscape.preprocess.actions import register_action_cls
 
 HAWKEARS_CKPT_URLS = {
-    "v0.1.0": "https://github.com/jhuus/HawkEars/raw/refs/tags/0.1.0/data/ckpt",
+    "0.1.0": "https://github.com/jhuus/HawkEars/raw/refs/tags/0.1.0/data/ckpt",
 }
 
 
@@ -55,7 +56,8 @@ class HawkEarsSpec(BaseAction):
             win_length=self.cfg.audio.win_length,
             hop_length=self.cfg.audio.hop_length,
             power=1,
-        ).to(self.device)
+        )
+        self.linear_transform.to(self.device)
 
         self.mel_transform = torchaudio.transforms.MelSpectrogram(
             sample_rate=self.cfg.audio.sampling_rate,
@@ -66,7 +68,8 @@ class HawkEarsSpec(BaseAction):
             f_max=self.cfg.audio.max_audio_freq,
             n_mels=self.cfg.audio.spec_height,
             power=self.cfg.audio.power,
-        ).to(self.device)
+        )
+        self.mel_transform.to(self.device)
 
     def _normalize(self, spec):
         """normalize values to have max=1"""
@@ -123,7 +126,7 @@ class HawkEarsSpec(BaseAction):
 
 
 import torch
-from bioacoustics_model_zoo.utils import download_github_file, register_bmz_model
+from bioacoustics_model_zoo.utils import download_file, register_bmz_model
 from pathlib import Path
 
 
@@ -174,8 +177,13 @@ class HawkEars(CNN):
             default to download v0.1.0 checkpoints from GitHub)
         force_reload: (bool) default False skips checkpoint downloads if local path already
             exists; True downloads and over-writes existing checkpoint files if ckpt_stem is URL
-        classes: list of class names ONLY if replacing classifier head with a custom classifier
-            - if None (default), uses classes from pre-trained checkpoint
+        version: only v0.1.0 is currently supported - updated versions coming soon
+        cache_dir: directory to cache downloaded files (uses default cache if None)
+
+    Returns:
+        model object with methods for generating predictions and embeddings, and trainig
+
+
     Example:
     ``` import bioacoustics_model_zoo as bmz
     m=bmz.HawkEars()
@@ -189,14 +197,17 @@ class HawkEars(CNN):
         cfg=None,
         ckpt_stem=None,
         force_reload=False,
+        version="0.1.0",
+        cache_dir=None,
     ):
+        self.version = version
         # use custom config if provided, otherwise default
         if cfg is None:
             cfg = hawkears_base_config.BaseConfig()
         self.cfg = cfg
 
         if ckpt_stem is None:
-            ckpt_stem = HAWKEARS_CKPT_URLS["v0.1.0"]
+            ckpt_stem = HAWKEARS_CKPT_URLS[f"{version}"]
         elif not str(ckpt_stem).startswith("http"):
             ckpt_stem = Path(ckpt_stem).resolve()  # local path: convert to full path
 
@@ -210,8 +221,14 @@ class HawkEars(CNN):
             if str(ckpt_path).startswith("http"):
                 # will skip download if file exists; to force re-download, delete existing checkpoints
                 print("Downloading model from URL...")
-                model_path = download_github_file(
-                    ckpt_path, redownload_existing=force_reload
+                filename = Path(ckpt_path).name
+                model_path = download_cached_file(
+                    ckpt_path,
+                    filename=filename,
+                    model_name="hawkears",
+                    model_version=self.version,
+                    cache_dir=cache_dir,
+                    redownload_existing=force_reload,
                 )
             else:
                 assert Path(ckpt_path).exists(), f"Checkpoint not found at {ckpt_path}"
@@ -341,7 +358,7 @@ class HawkEars(CNN):
         return model
 
     @property
-    def ensemble_list(self): #TODO: could this just be self.network.models instead?
+    def ensemble_list(self):  # TODO: could this just be self.network.models instead?
         return [
             self.network.model_0,
             self.network.model_1,

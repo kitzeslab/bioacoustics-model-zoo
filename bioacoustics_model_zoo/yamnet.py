@@ -64,6 +64,11 @@ class YAMNet(BaseClassifier):
         m.embed(['test.wav']) # returns dataframe of embeddings
         m.generate_logmelspecs(['test.wav']) # returns np.array of logmelspecs
         ```
+
+        Note: because TensorFlow Hub implements its own caching system, we do not use the bioacoustics
+        model zoo caching functionality here. TF Hub caches to a temporary directory by default (does not
+        persist across system restart), but this can be configured
+        (see https://www.tensorflow.org/hub/caching#caching_of_compressed_downloads)
         """
 
         # only require tensorflow and tensorflow_hub if/when this class is used

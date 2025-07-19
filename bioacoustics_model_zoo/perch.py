@@ -23,56 +23,66 @@ from bioacoustics_model_zoo.tensorflow_wrapper import (
 
 @register_bmz_model
 class Perch(TensorFlowModelWithPytorchClassifier):
+    """load Perch (aka Google Bird Vocalization Classifier) from TensorFlow Hub or local file
+
+    [Perch](https://www.kaggle.com/models/google/bird-vocalization-classifier/TensorFlow2/bird-vocalization-classifier/8)
+    is shared under the [Apache 2.0 License](https://opensource.org/license/apache-2-0/).
+
+    The model can be used to classify bird vocalizations from about 10,000 bird species, or
+    to generate feature embeddings for audio files. It was trained on recordings from Xeno Canto.
+
+    Model performance is described in :
+    ```
+    Ghani, Burooj, et al.
+    "Feature embeddings from large-scale acoustic bird classifiers enable few-shot transfer learning."
+    arXiv preprint arXiv:2307.06292 (2023).
+    ```
+
+    Note: because TensorFlow Hub implements its own caching system, we do not use the bioacoustics
+    model zoo caching functionality here. TF Hub caches to a temporary directory by default (does not
+    persist across system restart), but this can be configured
+    (see https://www.tensorflow.org/hub/caching#caching_of_compressed_downloads)
+
+    Args:
+        version: [default: 8], supports versions 3 & 4 (outputs (logits, embeddings))
+            and version 8 (outputs dictionary with keys 'order', 'family',
+            'genus', 'label', 'embedding', 'frontend')
+        path: (optional, typically leave as None)
+            optional url to model path on TensorFlow Hub (default is Perch v8),
+            Default: None locates the model on tfhub based on version argument
+
+            OR path to local _folder_ containing /savedmodel/saved_model.pb
+            and /label.csv
+
+            Note: adjust `version` argument to match the model version in the local folder
+        cache_dir: optional, over-ride default model caching location
+
+    Methods:
+        predict: get per-audio-clip per-class scores as pandas DataFrame
+        embed: generate embedding layer outputs for samples
+        forward: return all outputs as a dictionary with keys
+            ('order', 'embedding', 'family', 'frontend', 'genus', 'label'):
+            - order, family, genus, and label (species) are logits at
+                different taxonomic levels
+            - embedding is the feature vector from the penultimate layer
+            - frontend is the log mel spectrogram generated at the input
+                layer
+
+    Example 1: download from TFHub and generate logits and embeddings
+    ```
+    import bioacoustics_model_zoo as bm
+    model=bmz.Perch()
+    predictions = model.predict(['test.wav']) #predict on the model's classes
+    embeddings = model.embed(['test.wav']) #generate embeddings on each 5 sec of audio
+    ```
+
+    Example 2: loading from local folder
+    ```
+    m = bmz.Perch(path='/path/to/perch_folder/',)
+    """
 
     def __init__(self, version=8, path=None):
-        """load Perch (aka Google Bird Vocalization Classifier) from TensorFlow Hub or local file
 
-        [Perch](https://www.kaggle.com/models/google/bird-vocalization-classifier/TensorFlow2/bird-vocalization-classifier/8)
-        is shared under the [Apache 2.0 License](https://opensource.org/license/apache-2-0/).
-
-        The model can be used to classify bird vocalizations from about 10,000 bird species, or
-        to generate feature embeddings for audio files. It was trained on recordings from Xeno Canto.
-
-        Model performance is described in :
-        ```
-        Ghani, Burooj, et al.
-        "Feature embeddings from large-scale acoustic bird classifiers enable few-shot transfer learning."
-        arXiv preprint arXiv:2307.06292 (2023).
-        ```
-
-        Args:
-            version: [default: 8], supports versions 3 & 4 (outputs (logits, embeddings))
-                and version 8 (outputs dictionary with keys 'order', 'family',
-                'genus', 'label', 'embedding', 'frontend')
-            path: url to model path on TensorFlow Hub (default is Perch v4),
-                OR path to local _folder_ containing /savedmodel/saved_model.pb
-                and /label.csv
-                [default: None loads from TFHub based on version]
-                Note: adjust `version` argument to match the model version in the local folder
-
-        Methods:
-            predict: get per-audio-clip per-class scores as pandas DataFrame
-            embed: generate embedding layer outputs for samples
-            forward: return all outputs as a dictionary with keys
-                ('order', 'embedding', 'family', 'frontend', 'genus', 'label'):
-                - order, family, genus, and label (species) are logits at
-                    different taxonomic levels
-                - embedding is the feature vector from the penultimate layer
-                - frontend is the log mel spectrogram generated at the input
-                    layer
-
-        Example 1: download from TFHub and generate logits and embeddings
-        ```
-        import bioacoustics_model_zoo as bm
-        model=bmz.Perch()
-        predictions = model.predict(['test.wav']) #predict on the model's classes
-        embeddings = model.embed(['test.wav']) #generate embeddings on each 5 sec of audio
-        ```
-
-        Example 2: loading from local folder
-        ```
-        m = bmz.Perch(path='/path/to/perch_folder/',)
-        """
         # only require tensorflow and tensorflow_hub if/when this class is used
         try:
             import tensorflow as tf
@@ -83,6 +93,8 @@ class Perch(TensorFlowModelWithPytorchClassifier):
                 "tensorflow_hub packages to be installed. "
                 "Install in your python environment with `pip install tensorflow tensorflow_hub`"
             ) from exc
+
+        self.version = version
 
         tfhub_paths = {
             4: "https://www.kaggle.com/models/google/bird-vocalization-classifier/TensorFlow2/bird-vocalization-classifier/4",

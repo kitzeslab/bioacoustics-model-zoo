@@ -21,6 +21,8 @@ class RanaSierraeCNN(_CNN):
         Vocalizations and Nocturnal Activity of an Endangered Frog." The
         American Naturalist 203.5 (2024): 618-627.
 
+        Note: uses torch.hub, which caches files in ~/.cache/torch/hub/ by default
+        rather than in the bioacoustics model zoo's cache location.
         """
         # initialize resnet with random weights, since we will load pre-trained weights
         arch = resnet18(num_classes=2, weights=None)

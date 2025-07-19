@@ -13,7 +13,8 @@ from opensoundscape import Audio, Action
 
 from bioacoustics_model_zoo.utils import (
     AudioSampleArrayDataloader,
-    download_github_file,
+    download_file,
+    download_cached_file,
     register_bmz_model,
 )
 from bioacoustics_model_zoo.tensorflow_wrapper import (
@@ -28,6 +29,8 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         checkpoint_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP16.tflite",
         label_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt",
         num_tflite_threads=1,
+        cache_dir=None,
+        version="2.4",
     ):
         """load BirdNET global bird classification CNN from .tflite file on GitHub
 
@@ -58,8 +61,14 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         ```
 
         Args:
-            url: url to .tflite checkpoint on GitHub, or a local path to the .tflite file
+            checkpoint_url: url to .tflite checkpoint on GitHub, or a local path to the .tflite file
             label_url: url to .txt file with class labels, or a local path to the .txt file
+            num_tflite_threads: number of threads for TFLite interpreter
+            cache_dir: directory to cache downloaded files (uses default cache if None)
+            version: only '2.4' is currently supported for automatic download. However,
+                if you are specifying checkpoint downloads or local paths for version other than
+                2.4, pass the BirdNet model version to correctly set the model.version attribute
+                (used for model caching).
 
         Returns:
             model object with methods for generating predictions and embeddings
@@ -77,6 +86,8 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         m.embed(['test.wav']) # returns dataframe of embeddings
         ```
         """
+        self.version = str(version)
+
         # only require tensorflow if/when this class is used
         try:
             import ai_edge_litert.interpreter as tflite
@@ -88,7 +99,13 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
 
         # load class list:
         if label_url.startswith("http"):
-            label_path = download_github_file(label_url)
+            label_path = download_cached_file(
+                label_url,
+                filename=None,
+                model_name="birdnet",
+                model_version=self.version,
+                cache_dir=cache_dir,
+            )
         else:
             label_path = label_url
         label_path = Path(label_path).resolve()  # get absolute path
@@ -108,7 +125,13 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         # download model if URL, otherwise find it at local path:
         if checkpoint_url.startswith("http"):
             print("downloading model from URL...")
-            model_path = download_github_file(checkpoint_url)
+            model_path = download_cached_file(
+                checkpoint_url,
+                filename=None,
+                model_name="birdnet",
+                model_version=self.version,
+                cache_dir=cache_dir,
+            )
         else:
             model_path = checkpoint_url
 

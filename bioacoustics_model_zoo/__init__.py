@@ -2,6 +2,13 @@ import torch
 from bioacoustics_model_zoo import utils
 from bioacoustics_model_zoo.utils import list_models, describe_models, BMZ_MODEL_LIST
 from bioacoustics_model_zoo.utils import register_bmz_model
+from bioacoustics_model_zoo import cache
+from bioacoustics_model_zoo.cache import (
+    get_default_cache_dir,
+    set_default_cache_dir,
+    clear_cached_model,
+    clear_all_cached_models,
+)
 
 # handle optional dependencies
 try:
