@@ -114,8 +114,25 @@ if timm is None or torchaudio is None:
     class HawkEars(MissingHawkearsDependency):
         pass
 
+    @register_bmz_model
+    class HawkEars_Embedding(MissingHawkearsDependency):
+        pass
+
+    @register_bmz_model
+    class HawkEars_Low_Band(MissingHawkearsDependency):
+        pass
+
+    @register_bmz_model
+    class HawkEars_v010(MissingHawkearsDependency):
+        pass
+
 else:
-    from bioacoustics_model_zoo.hawkears.hawkears import HawkEars
+    from bioacoustics_model_zoo.hawkears.hawkears import (
+        HawkEars,
+        HawkEars_Embedding,
+        HawkEars_Low_Band,
+        HawkEars_v010,
+    )
     from bioacoustics_model_zoo import hawkears
 
 

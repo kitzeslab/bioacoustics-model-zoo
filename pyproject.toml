@@ -9,6 +9,7 @@ packages = [{include = "bioacoustics_model_zoo"}]
 [tool.poetry.dependencies]
 python = "^3.9"
 opensoundscape = ">=0.11.2"
+PyGithub = ">=2.6.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
