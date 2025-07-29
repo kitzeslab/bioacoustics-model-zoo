@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bioacoustics-model-zoo"
-version = "0.11.0"
+version = "0.12.0"
 description = "Public repository of machine learning models for bioacoustics, with OpenSoundscape integration"
 authors = ["sammlapp <sammlapp@gmail.com>"]
 readme = "README.md"
