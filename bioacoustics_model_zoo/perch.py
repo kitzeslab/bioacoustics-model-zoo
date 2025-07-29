@@ -159,6 +159,14 @@ class Perch(TensorFlowModelWithPytorchClassifier):
             ),
         )
 
+        # avoid invalid sample values outside of [-1,1]
+        self.preprocessor.insert_action(
+            action_index="normalize_signal",
+            action=Action(
+                opensoundscape.Audio.normalize, is_augmentation=False, peak_level=0.5
+            ),
+        )
+
     def _batch_forward(self, batch_data, return_dict=False):
         """run inference on a single batch of samples
 
