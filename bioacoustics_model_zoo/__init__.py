@@ -1,3 +1,5 @@
+__version__ = "0.11.0"
+
 import torch
 from bioacoustics_model_zoo import utils
 from bioacoustics_model_zoo.utils import list_models, describe_models, BMZ_MODEL_LIST
@@ -9,6 +11,9 @@ from bioacoustics_model_zoo.cache import (
     clear_cached_model,
     clear_all_cached_models,
 )
+
+# import a sample audio file and path to that file in the top-level API
+from opensoundscape import birds, birds_path
 
 # handle optional dependencies
 try:

@@ -6,47 +6,62 @@ Suggested Citation
 
 
 ## Set up / Installation
-To use the bioacoustics model zoo: 
 
-1. Create a python environment (3.9-3.11 supported) using conda or your preferred package manager
+### Option 1: Install from PyPI (Recommended)
 
-For example, using conda:
+1. Create a python environment (3.9-3.12 supported) using conda or your preferred package manager:
+
+```bash
+conda create -n bmz python=3.11
+conda activate bmz
 ```
-conda create -n bmz python=3.10
+
+2. Install the package with your desired model dependencies:
+
+```bash
+# Basic installation (core functionality only)
+pip install bioacoustics-model-zoo
+
+# Install with specific model dependencies
+pip install bioacoustics-model-zoo[hawkears]  # For HawkEars models
+pip install bioacoustics-model-zoo[birdnet]   # For BirdNET model
+pip install bioacoustics-model-zoo[tensorflow] # For TensorFlow models (Perch, YAMNet)
+pip install bioacoustics-model-zoo[birdset]   # For BirdSet models
+
+# Install all optional dependencies
+pip install bioacoustics-model-zoo[all]
 ```
 
-2. Install the repository from GitHub as a package. For instance, to install the `bioacousticsmodel-zoo` in a python environment (e.g. conda environment) using pip:
+### Option 2: Install from GitHub (Development)
 
+1. Create a python environment:
+```bash
+conda create -n bmz python=3.11
+conda activate bmz
 ```
-pip install opensoundscape
+
+2. Install from GitHub:
+```bash
 pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo
 ```
 
-If you want to intall a specific branch or release of the model zoo, for instance release 0.11.0, add an @ then the tag at the end of the command: 
-```
+For a specific version:
+```bash
 pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@0.11.0
 ```
 
-3. Install any additional dependencies for the specific models you want to use. Additional dependencies for each model are noted in the Model List below. For example, if using HawkEars you will need to 
-
-```
+3. Install additional dependencies as needed:
+```bash
+# For HawkEars models
 pip install timm torch torchvision torchaudio
-```
 
-for BirdSet models, use
-
-```
+# For BirdSet models  
 pip install torch torchvision torchaudio transformers
-```
 
-If using TensorFlow models (e.g. Perch) you will need to 
-
-```
+# For TensorFlow models (Perch, YAMNet)
 pip install tensorflow tensorflow-hub
-```
 
-For BirdNET, install the new home of tflite:
-```
+# For BirdNET (Note: LiteRT not available on Windows yet)
 pip install ai-edge-litert
 ```
 
@@ -68,8 +83,9 @@ If you encounter an issue or a bug, or would like to request a new feature, make
 ### List: 
 
 List available models in the GitHub repo [bioacoustics-model-zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/)
-```
-import bioacoustics_model_zoo as bm
+
+```python
+import bioacoustics_model_zoo as bmz
 bmz.list_models() 
 
 # or, for short textual descriptions: 
@@ -79,58 +95,22 @@ bmz.describe_models()
 ### Load: 
 
 Get a ready-to-use model object: choose from the models listed in the previous command
-```
+```python
 model = bmz.BirdNET()
 ```
 
 ### Inference:
 
-`model` is an OpenSoundscape CNN object (or other class) which you can use as normal. 
+Species classification models will have methods for `predict`, `embed`, and `train`.
 
-For instance, use the model to generate predictions on an audio file: 
+For instance, use a classification model to generate class presence predictions on an audio file: 
 
-```
-audio_file_path = './hydrophone_10s.wav'
+```python
+audio_file_path = bmz.birds_path # path to a 10-second audio clip
+model = bmz.BirdNET()
 scores = model.predict([audio_file_path],activation_layer='softmax')
 scores
 ```
-
-### Converting to Pytorch Lightning + Opensoundscape
-
-```python
-import opensoundscape as opso # v0.12.0
-import bioacoustics_model_zoo as bmz
-from opensoundscape.ml.lightning import LightningSpectrogramModule
-
-# Load any Pytorch-based model from the model zoo (not TensorFlow models like Perch/BirdNET)
-model = bmz.BirdSetConvNeXT()
-
-#convert to Lightning model object with .predict_with_trainer, .fit_with_trainer methods
-# note: develop branch of opensoundscape now implements LightningSpectrogramModule.from_model(model)
-lm = LightningSpectrogramModule(
-    architecture=model.network, classes=model.classes, sample_duration=model.preprocessor.sample_duration
-)
-lm.preprocessor = model.preprocessor
-# lm.predict_with_trainer(opso.birds_path)
-# lm.fit_with_trainer(...)
-```
-
-# Contributing
-
-To contribute a model to the model zoo, email `sam.lapp@pitt.edu` or add a model yourself:
-- fork this repository ([help](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo))
-- add a `.py` module in the bioacoustics_model_zoo subfolder implementing a class that instantiates your model object
-  - implement the predict() and embed() methods with an API matching the other models in the model zoo
-  - optionally implement train() method
-  - Note: if you have a pytorch model, you may be able to simply subclass opensoundscape.CNN without needing to override these methods
-  - in the docstring, provide an example of use
-  - in the docstring, also include a suggested citation for others using the model
-  - decorate your class with `@register_bmz_model` 
-- add an import statement in `__init__.py` to import your model class into the top-level package API (`from bioacoustics_model_zoo.new_model import NewModel`)
-- add your model to the Model List below in this document, with example usage
-- submit a pull request ([GitHub's help page](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork))
-
-Check out any of the existing models for examples of how to complete these steps. In particular, pick the current model class most similar to yours (pytorch vs tensorflow) as a starting point. 
 
 # Model list
 
@@ -377,7 +357,46 @@ OpenSoundscape the module is named `signal` rather than `signal_processing`)
 - [Manuscript: Lapp et al 2022](https://wildlife.onlinelibrary.wiley.com/doi/full/10.1002/wsb.1395)
 
 
-## Troubleshooting 
+# Converting BMZ models to Pytorch Lightning + Opensoundscape
+Opensoundscape 0.13.0 will make this easier by implementing LightningSpectrogramModule.from_model(model)
+
+```python
+import opensoundscape as opso # v0.12.0
+import bioacoustics_model_zoo as bmz
+from opensoundscape.ml.lightning import LightningSpectrogramModule
+
+# Load any Pytorch-based model from the model zoo (not TensorFlow models like Perch/BirdNET)
+model = bmz.BirdSetConvNeXT()
+
+#convert to Lightning model object with .predict_with_trainer, .fit_with_trainer methods
+# 
+lm = LightningSpectrogramModule(
+    architecture=model.network, classes=model.classes, sample_duration=model.preprocessor.sample_duration
+)
+lm.preprocessor = model.preprocessor
+# lm.predict_with_trainer(opso.birds_path)
+# lm.fit_with_trainer(...)
+```
+
+# Contributing
+
+To contribute a model to the model zoo, email `sam.lapp@pitt.edu` or add a model yourself:
+- fork this repository ([help](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo))
+- add a `.py` module in the bioacoustics_model_zoo subfolder implementing a class that instantiates your model object
+  - implement the predict() and embed() methods with an API matching the other models in the model zoo
+  - optionally implement train() method
+  - Note: if you have a pytorch model, you may be able to simply subclass opensoundscape.CNN without needing to override these methods
+  - in the docstring, provide an example of use
+  - in the docstring, also include a suggested citation for others using the model
+  - decorate your class with `@register_bmz_model` 
+- add an import statement in `__init__.py` to import your model class into the top-level package API (`from bioacoustics_model_zoo.new_model import NewModel`)
+- add your model to the Model List below in this document, with example usage
+- submit a pull request ([GitHub's help page](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork))
+
+Check out any of the existing models for examples of how to complete these steps. In particular, pick the current model class most similar to yours (pytorch vs tensorflow) as a starting point. 
+
+
+# Troubleshooting 
 
 ### TensorFlow Installation in Python Environment
 
