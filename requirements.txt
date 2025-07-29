@@ -1,6 +1,0 @@
-opensoundscape>=0.12.0
-# optional: 
-# timm
-# torchaudio
-# tensorflow_hub
-# tensorflow

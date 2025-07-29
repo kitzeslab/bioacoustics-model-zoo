@@ -1,0 +1,13 @@
+include LICENSE
+include README.md
+include CLAUDE.md
+include pytest.ini
+recursive-include bioacoustics_model_zoo *.py
+recursive-include bioacoustics_model_zoo/bmz_birdset/configs *.yaml
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .ipynb_checkpoints
+recursive-exclude tests *
+recursive-exclude debugging_notebooks *
+recursive-exclude resources *
+recursive-exclude src *
