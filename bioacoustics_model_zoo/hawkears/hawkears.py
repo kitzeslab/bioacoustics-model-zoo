@@ -1,6 +1,7 @@
 import warnings
 import pandas as pd
 import cv2
+import numpy as np
 
 from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
 from opensoundscape.preprocess.actions import Action, BaseAction
@@ -127,6 +128,12 @@ class HawkEarsSpec(BaseAction):
         # normalize
         spec = self._normalize(spec)
 
+        # reshape if needed (https://github.com/jhuus/HawkEars/blob/f924114ebe6e6f220df74f9fb136f6194f7ac0e8/core/audio.py#L150C17-L153C17)
+        spec = spec[:self.cfg.audio.spec_height, :self.cfg.audio.spec_width]
+        if spec.shape[1] < self.cfg.audio.spec_width:
+            spec = np.pad(spec, ((0, 0), (0, self.cfg.audio.spec_width - spec.shape[1])), 'constant', constant_values=0)
+        
+
         # update the AudioSample's .data in-place
         sample.data = torch.tensor(spec).unsqueeze(0)
 
@@ -225,8 +232,14 @@ class HawkEars(CNN):
             assert (
                 not load_embedding_model
             ), "load_lowband_model and load_embedding_model cannot both be True"
+            self.name = "hawkears_low_band"
+        elif self.is_embedding_model:
+            self.name = "hawkears_embedding"
+        else:
+            self.name = "hawkears"
 
         self.version = version
+
         # use custom config if provided, otherwise default
         if cfg is None:
             cfg = hawkears_base_config.BaseConfig()
@@ -253,7 +266,7 @@ class HawkEars(CNN):
                 model_path = download_cached_file(
                     ckpt_path,
                     filename=filename,
-                    model_name="hawkears",
+                    model_name=self.name,
                     model_version=self.version,
                     cache_dir=cache_dir,
                     redownload_existing=force_reload,
@@ -562,6 +575,7 @@ class HawkEars_v010(HawkEars):
         cache_dir=None,
     ):
         self.version = "0.1.0"
+        self.name = "hawkears_v010"
         # use custom config if provided, otherwise default
         if cfg is None:
             cfg = hawkears_base_config.BaseConfig()
@@ -589,7 +603,7 @@ class HawkEars_v010(HawkEars):
                 model_path = download_cached_file(
                     ckpt_path,
                     filename=filename,
-                    model_name="hawkears",
+                    model_name=self.name,
                     model_version=self.version,
                     cache_dir=cache_dir,
                     redownload_existing=force_reload,

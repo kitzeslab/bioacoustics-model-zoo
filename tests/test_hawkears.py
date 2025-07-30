@@ -13,7 +13,12 @@ try:
     import torchaudio
     import torch
     import opensoundscape
-    from bioacoustics_model_zoo.hawkears.hawkears import HawkEars
+    from bioacoustics_model_zoo.hawkears.hawkears import (
+        HawkEars,
+        HawkEars_Embedding,
+        HawkEars_Low_Band,
+    )
+
     HAS_HAWKEARS_DEPS = True
 except ImportError:
     HAS_HAWKEARS_DEPS = False
@@ -36,9 +41,9 @@ def mock_checkpoint_data():
         "hyper_parameters": {
             "model_name": "hgnet_tiny",
             "train_class_names": ["Class1", "Class2", "Class3"],
-            "train_class_codes": ["C1", "C2", "C3"]
+            "train_class_codes": ["C1", "C2", "C3"],
         },
-        "state_dict": {}
+        "state_dict": {},
     }
 
 
@@ -47,6 +52,20 @@ def model():
     if not HAS_HAWKEARS_DEPS:
         pytest.skip("HawkEars dependencies not available")
     return HawkEars()
+
+
+@pytest.fixture
+def low_band_model():
+    if not HAS_HAWKEARS_DEPS:
+        pytest.skip("HawkEars dependencies not available")
+    return HawkEars_Low_Band()
+
+
+@pytest.fixture
+def embedding_model():
+    if not HAS_HAWKEARS_DEPS:
+        pytest.skip("HawkEars dependencies not available")
+    return HawkEars_Embedding()
 
 
 @pytest.fixture
@@ -66,9 +85,9 @@ def train_df():
 @pytest.mark.skipif(SKIP_HAWKEARS, reason="HawkEars dependencies not available")
 def test_hawkears_init(model):
     """Test that HawkEars initializes correctly."""
-    assert hasattr(model, 'classes')
-    assert hasattr(model, 'preprocessor')
-    assert hasattr(model, 'network')
+    assert hasattr(model, "classes")
+    assert hasattr(model, "preprocessor")
+    assert hasattr(model, "network")
     assert len(model.classes) > 0
 
 
@@ -80,8 +99,10 @@ def test_hawkears_init_no_weights():
 
 
 @pytest.mark.skipif(SKIP_HAWKEARS, reason="HawkEars dependencies not available")
-@pytest.mark.skipif(not Path("tests/data/birds_10s.wav").exists(), 
-                   reason="Test audio file not available")
+@pytest.mark.skipif(
+    not Path("tests/data/birds_10s.wav").exists(),
+    reason="Test audio file not available",
+)
 def test_hawkears_predict(model):
     """Test HawkEars prediction method."""
     predictions = model.predict(["tests/data/birds_10s.wav"], batch_size=2)
@@ -90,8 +111,34 @@ def test_hawkears_predict(model):
 
 
 @pytest.mark.skipif(SKIP_HAWKEARS, reason="HawkEars dependencies not available")
-@pytest.mark.skipif(not Path("tests/data/birds_10s.wav").exists(),
-                   reason="Test audio file not available")
+@pytest.mark.skipif(
+    not Path("tests/data/birds_10s.wav").exists(),
+    reason="Test audio file not available",
+)
+def test_hawkears_low_band_predict(low_band_model):
+    """Test HawkEars prediction method."""
+    predictions = low_band_model.predict(["tests/data/birds_10s.wav"], batch_size=2)
+    assert isinstance(predictions, pd.DataFrame)
+    assert len(predictions) > 0
+
+
+@pytest.mark.skipif(SKIP_HAWKEARS, reason="HawkEars dependencies not available")
+@pytest.mark.skipif(
+    not Path("tests/data/birds_10s.wav").exists(),
+    reason="Test audio file not available",
+)
+def test_hawkears_embedding_predict(embedding_model):
+    """Test HawkEars prediction method."""
+    predictions = embedding_model.predict(["tests/data/birds_10s.wav"], batch_size=2)
+    assert isinstance(predictions, pd.DataFrame)
+    assert len(predictions) > 0
+
+
+@pytest.mark.skipif(SKIP_HAWKEARS, reason="HawkEars dependencies not available")
+@pytest.mark.skipif(
+    not Path("tests/data/birds_10s.wav").exists(),
+    reason="Test audio file not available",
+)
 def test_hawkears_embed(model):
     """Test HawkEars embedding method."""
     embeddings = model.embed(["tests/data/birds_10s.wav"])
@@ -111,63 +158,75 @@ def test_hawkears_train(model, train_df):
 @pytest.mark.skipif(SKIP_HAWKEARS, reason="HawkEars dependencies not available")
 class TestHawkEarsCache:
     """Test HawkEars caching functionality."""
-    
-    @patch('bioacoustics_model_zoo.utils.download_cached_file')
-    @patch('torch.load')
-    @patch('bioacoustics_model_zoo.hawkears.architecture_constructors.get_hgnet')
-    def test_hawkears_custom_cache_dir(self, mock_get_hgnet, mock_torch_load, mock_download,
-                                     temp_cache_dir, mock_checkpoint_data):
+
+    @patch("bioacoustics_model_zoo.utils.download_cached_file")
+    @patch("torch.load")
+    @patch("bioacoustics_model_zoo.hawkears.architecture_constructors.get_hgnet")
+    def test_hawkears_custom_cache_dir(
+        self,
+        mock_get_hgnet,
+        mock_torch_load,
+        mock_download,
+        temp_cache_dir,
+        mock_checkpoint_data,
+    ):
         """Test HawkEars with custom cache directory."""
         checkpoint_files = []
         for i in range(1, 6):
             ckpt_path = Path(temp_cache_dir) / f"hgnet{i}.ckpt"
             ckpt_path.touch()
             checkpoint_files.append(ckpt_path)
-        
+
         mock_download.side_effect = checkpoint_files
         mock_torch_load.return_value = mock_checkpoint_data
         mock_get_hgnet.return_value = MagicMock()
-        
+
         # Initialize with custom cache_dir
         model = HawkEars(cache_dir=temp_cache_dir)
-        
+
         # Verify cache_dir was passed to download calls
         for call in mock_download.call_args_list:
             args, kwargs = call
-            assert kwargs['cache_dir'] == temp_cache_dir
-            assert kwargs['model_name'] == 'hawkears'
-    
-    @patch('bioacoustics_model_zoo.utils.download_cached_file')
-    @patch('torch.load')
-    @patch('bioacoustics_model_zoo.hawkears.architecture_constructors.get_hgnet')
-    def test_hawkears_force_reload(self, mock_get_hgnet, mock_torch_load, mock_download,
-                                 temp_cache_dir, mock_checkpoint_data):
+            assert kwargs["cache_dir"] == temp_cache_dir
+            assert kwargs["model_name"] == "hawkears"
+
+    @patch("bioacoustics_model_zoo.utils.download_cached_file")
+    @patch("torch.load")
+    @patch("bioacoustics_model_zoo.hawkears.architecture_constructors.get_hgnet")
+    def test_hawkears_force_reload(
+        self,
+        mock_get_hgnet,
+        mock_torch_load,
+        mock_download,
+        temp_cache_dir,
+        mock_checkpoint_data,
+    ):
         """Test HawkEars with force_reload option."""
         checkpoint_files = []
         for i in range(1, 6):
             ckpt_path = Path(temp_cache_dir) / f"hgnet{i}.ckpt"
             ckpt_path.touch()
             checkpoint_files.append(ckpt_path)
-        
+
         mock_download.side_effect = checkpoint_files
         mock_torch_load.return_value = mock_checkpoint_data
         mock_get_hgnet.return_value = MagicMock()
-        
+
         # Initialize with force_reload=True
         model = HawkEars(force_reload=True, cache_dir=temp_cache_dir)
-        
+
         # Verify redownload_existing was set to True
         for call in mock_download.call_args_list:
             args, kwargs = call
-            assert kwargs['redownload_existing'] is True
+            assert kwargs["redownload_existing"] is True
 
 
 @pytest.mark.skipif(HAS_HAWKEARS_DEPS, reason="Dependencies are available")
 def test_hawkears_missing_dependencies():
     """Test that HawkEars raises appropriate error when dependencies are missing."""
     from bioacoustics_model_zoo import HawkEars
-    
+
     with pytest.raises(ImportError) as exc_info:
         HawkEars()
-    
+
     assert "required" in str(exc_info.value).lower()
