@@ -57,7 +57,7 @@ requests-mock = "^1.11.0"
 # Include all optional dependencies for development
 tensorflow = ">=2.13.0"
 tensorflow-hub = ">=0.14.0"
-ai-edge-litert = ">=1.0.0,<1.4"
+ai-edge-litert = ">=1.0.0,!=1.4.0"
 torch = ">=1.13.0"
 torchvision = ">=0.14.0"
 torchaudio = ">=0.13.0"

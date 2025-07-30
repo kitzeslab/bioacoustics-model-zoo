@@ -1,0 +1,8 @@
+opensoundscape>=0.12.0
+tensorflow
+tensorflow-estimator
+tensorflow-hub
+tensorflow-io-gcs-filesystem
+tensorflow-macos
+keras
+tf-keras
