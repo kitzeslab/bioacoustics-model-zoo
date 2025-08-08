@@ -13,23 +13,59 @@ from opensoundscape.ml.shallow_classifier import MLPClassifier
 
 class TensorFlowModelWithPytorchClassifier(CNN):
     def __init__(self, embedding_size, classes, sample_duration):
-        """ """
+        """base class for TensorFlow models with trainable pytorch classifier head
+
+        Args:
+            embedding_size: int, size of the 1D feature vector output by the TensorFlow model
+            classes: list of str, class names for the classifier
+            sample_duration: float, duration of audio samples in seconds
+        """
         # initialize a CNN where self.network is a pytorch classification head
         self.embedding_size = embedding_size
-        clf = MLPClassifier(input_size=self.embedding_size, output_size=len(classes))
+        # separate custom_classes list from self.classes (original class list)
+        self._custom_classes = ["undefined"]
+        self._original_classes = classes
+
+        self.use_custom_classifier = False
+        """(bool) whether to generate predictions using self.tf_model or the custom classifier
+
+        initially False, but gets set to True if .train() is called
+        """
+        clf = MLPClassifier(
+            input_size=embedding_size, output_size=len(self._custom_classes)
+        )
         super().__init__(
             architecture=clf, classes=classes, sample_duration=sample_duration
         )
 
-        self.use_custom_classifier = False
-        """(bool) whether to generate predictions using BirdNET or the custom classifier
-
-        initially False, but gets set to True if .train() is called
-        """
-
         self.tf_model = None  # set by subclass, holds the TensorFlow model
 
-    def initialize_custom_classifier(self, hidden_layer_sizes=(), classes=None):
+    @property
+    def classes(self):
+        if self.use_custom_classifier:
+            return self._custom_classes
+        else:
+            return self._original_classes
+
+    # setter
+    @classes.setter
+    def classes(self, new_classes):
+        if self.use_custom_classifier:
+            self._custom_classes = new_classes
+        else:
+            self._original_classes = new_classes
+
+    @property
+    def classifier(self):
+        return self.network
+
+    def change_classes(self, new_classes, hidden_layer_sizes=()):
+        """alias for initialize_custom_classifier"""
+        self.initialize_custom_classifier(
+            new_classes=new_classes, hidden_layer_sizes=hidden_layer_sizes
+        )
+
+    def initialize_custom_classifier(self, new_classes, hidden_layer_sizes=()):
         """initialize a custom classifier to replace the BirdNET classifier head
 
         The classifier is a multi-layer perceptron with ReLU activations and a final
@@ -38,6 +74,11 @@ class TensorFlowModelWithPytorchClassifier(CNN):
 
         The new classifier (self.network) will have random weights, and can be trained with
         self.train().
+
+        Sets self.use_custom_classifier = True, so that predict() returns outputs from the
+        custom classifier rather than from the original TF model classification head.
+        Set .use_custom_classifier=False if you want predict to return the original
+        model's classification logits.
 
         Args:
             hidden_layer_sizes: tuple of int, sizes of hidden layers in the classifier
@@ -50,13 +91,14 @@ class TensorFlowModelWithPytorchClassifier(CNN):
             runs self.change_classes(classes) if classes is not None, resulting in
                 self.classes = classes
         """
-        if classes is not None:
-            self.change_classes(classes)
+        self._custom_classes = new_classes
         self.network = MLPClassifier(
             input_size=self.embedding_size,
-            output_size=len(self.classes),
+            output_size=len(new_classes),
             hidden_layer_sizes=hidden_layer_sizes,
         )
+        self.use_custom_classifier = True
+        self._init_torch_metrics()
 
     @property
     def custom_classifier(self):

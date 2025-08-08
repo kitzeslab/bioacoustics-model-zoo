@@ -68,7 +68,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     model=bmz.Perch2()
     predictions = model.predict(['test.wav']) #predict on the model's classes
     embeddings = model.embed(['test.wav']) #generate embeddings on each 5 sec of audio
-    all_outputs = model.forward(['test.wav'], return_value='all') #get all model outputs
+    all_outputs = model.forward(['test.wav']) #get all model outputs including spectrograms and spatial embeddings
     all_outputs['spatial_embedding'].shape # np.array of spatial embeddings
     ```
 
@@ -76,7 +76,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     ```
     pip install --upgrade opensoundscape
     pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@perch2
-    pip install tensorflow==2.20.0rc0 tensorflow-hub
+    pip install tensorflow==2.20.0rc0[and-cuda] tensorflow-hub
     pip install --no-deps tf-keras==0.19.0
     ```
 
@@ -171,7 +171,9 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             ),
         )
 
-    def _batch_forward(self, batch_data, return_dict=False):
+    def _batch_forward(
+        self, batch_data, return_dict=False, apply_custom_classifier=False
+    ):
         """run inference on a single batch of samples
 
         Returned logits depend on self.use_custom_classifier: if False, returns
@@ -183,36 +185,42 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             return_dict: bool, if True, returns a dictionary of all outputs
                 [default: False] return (embeddings, logits)
                 if True, returns dictionary with keys:
-                ['embedding', 'spatial_embedding', 'label', 'spectrogram']
+                ['embedding', 'spatial_embedding', 'label', 'spectrogram','custom_classifier_logits']
+            apply_custom_classifier: [default: False] if True, run self.network(embeddings)
+                to generate 'custom_classifier_logits' output
 
         Returns:
             if return_dict=False: tuple (embeddings, logits)
             if return_dict=True: dictionary with keys:
-                ['embedding', 'spatial_embedding', 'label', 'spectrogram']
+                ['embedding', 'spatial_embedding', 'label', 'spectrogram','custom_classifier_logits']
         """
-
         model_outputs = self.tf_model.signatures["serving_default"](inputs=batch_data)
 
         # move tensorflow tensors to CPU and convert to numpy
         outs = {k: None if v is None else v.numpy() for k, v in model_outputs.items()}
 
-        if self.use_custom_classifier:
-            # use custom classifier to generate logits
+        if apply_custom_classifier:
             emb_tensor = torch.tensor(outs["embedding"]).to(self.device)
             self.network.to(self.device)
-            logits = self.network(emb_tensor).detach().cpu().numpy()
-            # add additional key to output dictionary
-            outs["custom_classifier"] = logits
-        else:
-            logits = outs["label"]
+            outs["custom_classifier_logits"] = (
+                self.network(emb_tensor).detach().cpu().numpy()
+            )
 
         if return_dict:
             return outs
-        else:
-            return outs["embedding"], logits
+        else:  # return embeddings, logits
+            # which logits depends on self.use_custom_classifier
+            # (True: custom classifier ie self.network, False: original Perch2 logits)
+            if self.use_custom_classifier:
+                return outs["embedding"], outs["custom_classifier_logits"]
+            return outs["embedding"], outs["label"]
 
     def __call__(
-        self, dataloader, wandb_session=None, progress_bar=True, return_value="logits"
+        self,
+        dataloader,
+        wandb_session=None,
+        progress_bar=True,
+        return_values=None,
     ):
         """run forward pass of model, iterating through dataloader batches
 
@@ -223,52 +231,69 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             dataloader: instance of SafeAudioDataloader or custom subclass
             wandb_session: wandb.Session object, if provided, logs progress
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
-            return_value: str, 'logits', 'embeddings', 'spatial_embeddings', or 'all'
-                [default: 'logits']
-                - 'logits': returns only the logits on the species classes
-                - 'embeddings': returns only the feature vectors from the penultimate layer
-                    embedding shape: (1536,)
-                - 'spatial_embeddings': returns only the spatial embeddings from the model
-                    (embedding shape: (5, 3, 1536))
-                - 'all': returns dictionary with all Perch outputs:
-                    keys: ['embedding', 'spatial_embedding', 'label', 'spectrogram']
-                Note: if self.custom_classifier=True:
-                - for return_value='logits', returns logits from self.network
-                - for return_value='all', returns dictionary with additional key
-                'custom_classifier' with logits from self.network
+            return_values: tuple(str,): select from 'logits', 'embeddings', 'spatial_embeddings','spectrograms'
+                [default:  None] returns logits from custom classifier (self.network) if
+                    self.use_custom_classifier=True, otherwise returns Perch2 class logits
+                Include any combination of the following:
+                - 'logits': logit scores (class predictions) on the species classes
+                - 'embeddings': 1D feature vectors from the penultimate layer of the network
+                - 'spatial_embeddings': un-pooled spatial embeddings from the network
+                - 'spectrograms': log-mel spectrograms generated during preprocessing
+                - 'custom_classifier_logits': outputs of the custom classifier head
 
-        Returns: depends on return_value argument (see above)
+        Returns:
+            - return_values=None: returns outputs of custom classifier
+                (if self.use_custom_classifier=True), otherwise returns Perch2 logits
+            - return_values specified: dictionary of requested outputs, with keys matching return_values
+
 
         """
         # check return_value argument is valid
-        return_value_options = ("logits", "embeddings", "spatial_embeddings", "all")
-        err = f"return_value must be one of {return_value_options}, got {return_value}"
-        assert return_value in return_value_options
+        return_value_options = (
+            "logits",
+            "embeddings",
+            "spatial_embeddings",
+            "spectrograms",
+            "custom_classifier_logits",
+        )
+        if return_values is None:
+            if self.use_custom_classifier:
+                _return_values = ("custom_classifier_logits",)
+            else:
+                _return_values = ("logits",)
+        else:  # check return values are from supported list
+            assert all(
+                rv in return_value_options for rv in return_values
+            ), f"return_values must be a tuple with any of {return_value_options}, got {return_values}"
+            _return_values = return_values
 
         # iterate batches, running inference on each
-        logits = []
-        embeddings = []
-        spatial_embeddings = []
-        spectrograms = []
-        custom_classifier_logits = []
+        # only aggregate requested outputs to save memory
+        returns = {k: [] for k in return_value_options if k in _return_values}
         for i, (samples_batch, _) in enumerate(
             tqdm(dataloader, disable=not progress_bar)
         ):
             # _batch_forward returns dict with tf model outputs + custom classifier
             # logits if self.use_custom_classifier=True
-            outs = self._batch_forward(samples_batch, return_dict=True)
+            outs = self._batch_forward(
+                samples_batch,
+                return_dict=True,
+                apply_custom_classifier=("custom_classifier_logits" in _return_values),
+            )
 
             # only aggregate the outputs requested to save memory
-            if return_value in ("all", "logits"):
-                logits.extend(outs["label"].tolist())
-                if self.use_custom_classifier:
-                    custom_classifier_logits.extend(outs["custom_classifier"].tolist())
-            if return_value in ("all", "embeddings"):
-                embeddings.extend(outs["embedding"].tolist())
-            if return_value in ("all", "spatial_embeddings"):
-                spatial_embeddings.extend(outs["spatial_embedding"].tolist())
-            if return_value == "all":
-                spectrograms.extend(outs["spectrogram"].tolist())
+            if "logits" in _return_values:
+                returns["logits"].extend(outs["label"].tolist())
+            if "custom_classifier_logits" in _return_values:
+                returns["custom_classifier_logits"].extend(
+                    outs["custom_classifier_logits"].tolist()
+                )
+            if "embeddings" in _return_values:
+                returns["embeddings"].extend(outs["embedding"].tolist())
+            if "spatial_embeddings" in _return_values:
+                returns["spatial_embeddings"].extend(outs["spatial_embedding"].tolist())
+            if "spectrograms" in _return_values:
+                returns["spectrograms"].extend(outs["spectrogram"].tolist())
 
             if wandb_session is not None:
                 wandb_session.log(
@@ -278,62 +303,93 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                         "total_batches": len(dataloader),
                     }
                 )
-        if return_value == "all":
-            return {
-                "label": np.array(logits),
-                "embedding": np.array(embeddings),
-                "spatial_embedding": np.array(spatial_embeddings),
-                "spectrogram": np.array(spectrograms),
-                "custom_classifier": (
-                    np.array(custom_classifier_logits)
-                    if self.use_custom_classifier
-                    else None
-                ),
-            }
-        elif return_value == "embeddings":
-            return np.array(embeddings)
-        elif return_value == "logits":
-            return (
-                np.array(custom_classifier_logits)
-                if self.use_custom_classifier
-                else np.array(logits)
-            )
-        elif return_value == "spatial_embeddings":
-            return np.array(spatial_embeddings)
+
+        if return_values is None:  # just return one set of values
+            if self.use_custom_classifier:
+                return np.array(returns["custom_classifier_logits"])
+            else:
+                return np.array(returns["logits"])
+        return {k: np.array(v) for k, v in returns.items()}
 
     def forward(
-        self, samples, progress_bar=True, wandb_session=None, return_value="all"
+        self,
+        samples,
+        progress_bar=True,
+        wandb_session=None,
+        return_values=("logits", "embeddings", "spatial_embeddings", "spectrograms"),
+        return_dfs=True,
+        **dataloader_kwargs,
     ):
         """
         Run inference on a list of samples, returning all outputs as a dictionary
 
         wraps self.predict_dataloader() and self.__call__() to run the model on audio files/clips
 
+        then optionally places 1D outputs in dataframes
+
         Args:
             samples: list of file paths, OR pd.DataFrame with index containing audio file paths
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
             wandb_session: wandb.Session object, if provided, logs progress
-            return_value: str, one of 'logits', 'embeddings', 'spatial_embeddings', or 'all'
-                [default: 'all'] returns all outputs as a dictionary, otherwise
-                returns only the requested output type
+            return_values: tuple(str,): select from 'logits', 'embeddings',
+                'spatial_embeddings', 'spectrograms', 'custom_classifier_logits'
+                [default: ('logits','embeddings','spatial_embeddings','spectrograms')]
+                Include any combination of the following:
+                - 'logits': logit scores (class predictions) on the species classes
+                - 'embeddings': 1D feature vectors from the penultimate layer of the network
+                - 'spatial_embeddings': un-pooled spatial embeddings from the network
+                - 'spectrograms': log-mel spectrograms generated during preprocessing
+                - 'custom_classifier_logits': outputs of the custom classifier head (self.network)
+            return_dfs: bool, if True, returns outputs as pd.DataFrame with multi-index like
+                .predict() ('file','start_time','end_time'), if False, returns np.array
+                [default: True]
+            **dataloader_kwargs: additional keyword arguments passed to the dataloader such
+                as batch_size, num_workers, etc.
 
-        Returns: dictionary with keys ('order', 'embedding', 'family', 'frontend', 'genus', 'label'):
-            - order, family, genus, and label (species) are dataframes of logits at different taxonomic levels
-            - embedding is a dataframe with the feature vector from the penultimate layer
-            - frontend is np.array of log mel spectrograms generated at the input layer
-            - if self.use_custom_classifier, includes additional key 'custom_classifier'
-                with a dataframe containing the outputs of self.network(embeddings)
+        Returns: dictionary with content depending on return_values and return_dfs arguments:
+            - 'logits': pd.DataFrame or np.array of per-clip logits on species classes
+                shape: (num_clips, num_classes)
+            - 'embeddings': pd.DataFrame or np.array of per-clip 1D feature vectors
+                shape: (num_clips, 1536)
+            - 'spatial_embeddings': np.array of per-clip spatial embeddings
+                shape: (num_clips, 5, 3, 1536)
+            - 'custom_classifier_logits': pd.DataFrame or np.array of per-clip logits from the
+                custom classifier head, shape: (num_clips, num_custom_classes)
         """
         # create dataloader to generate batches of AudioSamples
-        dataloader = self.predict_dataloader(samples)
+        dataloader = self.predict_dataloader(samples, **dataloader_kwargs)
 
         # run inference, getting all outputs
-        return self(
+        # avoids aggregating unrequested outputs to save memory
+        results_dict = self(
             dataloader=dataloader,
             wandb_session=wandb_session,
             progress_bar=progress_bar,
-            return_value=return_value,
+            return_values=return_values,
         )
+
+        # optionally put 1D outputs in DataFrames with multi-index ('file','start_time','end_time')
+        if return_dfs:
+            if "logits" in results_dict:
+                results_dict["logits"] = pd.DataFrame(
+                    data=results_dict["logits"],
+                    index=dataloader.dataset.dataset.label_df.index,
+                    columns=self._original_classes,
+                )
+            if "embeddings" in results_dict:
+                results_dict["embeddings"] = pd.DataFrame(
+                    data=results_dict["embeddings"],
+                    index=dataloader.dataset.dataset.label_df.index,
+                    columns=None,
+                )
+            if "custom_classifier_logits" in results_dict:
+                results_dict["custom_classifier_logits"] = pd.DataFrame(
+                    data=results_dict["custom_classifier_logits"],
+                    index=dataloader.dataset.dataset.label_df.index,
+                    columns=self._custom_classes,
+                )
+
+        return results_dict
 
     def embed(
         self,
@@ -341,10 +397,19 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         progress_bar=True,
         return_preds=False,
         return_dfs=True,
-        **kwargs,
+        wandb_session=None,
+        **dataloader_kwargs,
     ):
         """
         Generate embeddings for audio files/clips
+
+        Matches API of opensoundscape.SpectrogramClassifier/CNN classes
+
+        Wraps .forward(), selecting embedding and possibly logits as outputs
+
+        Note: when return_preds=True, values returned depend on self.use_custom_classifier:
+            - if True, returns outputs of self.network()
+            - if False, returns original Perch2 class logits
 
         Args:
             samples: same as CNN.predict(): list of file paths, OR pd.DataFrame with index
@@ -352,52 +417,45 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 end_time)
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
             return_preds: bool, if True, returns two outputs (embeddings, logits)
+                - logits are Perch2 class logits if self.use_custom_classifier=False,
+                and self.network() outputs if self.use_custom_classifier=True
             return_dfs: bool, if True, returns embeddings as pd.DataFrame with multi-index like
                 .predict(). if False, returns np.array of embeddings [default: True].
-            kwargs are passed to self.predict_dataloader()
+            wandb_session: [default: None] a weights and biases session object
+            **dataloader_kwargs are passed to self.predict_dataloader()
 
         Returns: (embeddings, preds) if return_preds=True or embeddings if return_preds=False
             types are pd.DataFrame if return_dfs=True, or np.array if return_dfs=False
-            - preds are always logit scores with no activation layer applied
+            - preds are always original Perch2 class logit scores with no activation layer applied
             - embeddings are the feature vectors from the penultimate layer of the network
+            If other outputs are desired, eg custom classifier logits, use forward()
 
         See also:
             - predict: get per-audio-clip species outputs as pandas DataFrame
-            - forward: return all outputs as a dictionary with keys
+            - forward: get all of Perch's outputs, or any subset
         """
-        # create dataloader to generate batches of AudioSamples
-        dataloader = self.predict_dataloader(samples, **kwargs)
+        if return_preds:
+            if self.use_custom_classifier:  # self.network outputs
+                return_values = ("embeddings", "custom_classifier_logits")
+            else:  # Perch2 original class logits
+                return_values = ("embeddings", "logits")
+        else:
+            return_values = ("embeddings",)
 
         # run inference, getting embeddings and optionally logits
-        if return_preds:
-            # get all outputs, then extract embeddings and logits
-            outs = self(
-                dataloader=dataloader,
-                progress_bar=progress_bar,
-                return_value="all",
-            )
-            embeddings = outs["embedding"]
-            preds = outs["label"]
-        else:
-            # save memory by only aggergating the embeddigs
-            embeddings = self(
-                dataloader=dataloader,
-                progress_bar=progress_bar,
-                return_value="embeddings",
-            )
-
-        if return_dfs:
-            # put embeddings in DataFrame with multi-index like .predict()
-            embeddings = pd.DataFrame(
-                data=embeddings, index=dataloader.dataset.dataset.label_df.index
-            )
+        outs = self.forward(
+            samples=samples,
+            progress_bar=progress_bar,
+            wandb_session=wandb_session,
+            return_values=return_values,
+            return_dfs=return_dfs,
+            **dataloader_kwargs,
+        )
 
         if return_preds:
-            if return_dfs:
-                # put predictions in a DataFrame with same index as embeddings
-                preds = pd.DataFrame(
-                    data=preds, index=dataloader.dataset.dataset.label_df.index
-                )
-            return embeddings, preds
+            if self.use_custom_classifier:
+                return outs["embeddings"], outs["custom_classifier_logits"]
+            else:
+                return outs["embeddings"], outs["logits"]
         else:
-            return embeddings
+            return outs["embeddings"]

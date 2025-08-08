@@ -135,6 +135,10 @@ import bioacoustics_model_zoo as bmz
 m = bmz.Perch2()
 m.predict(['test.wav']) # returns dataframe of per-class scores
 m.embed(['test.wav']) # returns dataframe of embeddings
+
+# .forward() returns all outputs: a dictionary with 1D embeddings, 
+# spatial embeddings, class scores, and spectrograms
+m.forward(['test.wav'],batch_size=32,num_workers=4) 
 ```
 
 Training: 
