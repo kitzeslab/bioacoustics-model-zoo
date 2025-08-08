@@ -150,6 +150,9 @@ class Perch(TensorFlowModelWithPytorchClassifier):
         )
         self.sample_duration = 5
 
+        # match the resampling method used by Perch / HopLite repo
+        self.preprocessor.pipeline["load_audio"].params["resample_type"] = "polyphase"
+
         # extend short samples to 5s by padding end with zeros (silence)
         self.preprocessor.insert_action(
             action_index="extend",
@@ -158,7 +161,7 @@ class Perch(TensorFlowModelWithPytorchClassifier):
             ),
         )
 
-        # avoid invalid sample values outside of [-1,1]
+        # perch v2 preprocessing normalizes audio to peak = 0.25
         self.preprocessor.insert_action(
             action_index="normalize_signal",
             action=Action(
