@@ -3,16 +3,6 @@ from bioacoustics_model_zoo.tensorflow_wrapper import (
     TensorFlowModelWithPytorchClassifier,
 )
 
-
-# environment notes:
-"""
-pip install --upgrade opensoundscape bioacoustics-model-zoo
-pip install tensorflow==2.20.0rc0 tensorflow-hub
-pip install perch-hoplite
-# force upgrade of just tf-keras even though tf-keras 0.19.0 wants to downgrade tf to 2.19.0
-pip install --no-deps tf-keras==0.19.0 
-"""
-
 from pathlib import Path
 
 import pandas as pd
@@ -80,6 +70,14 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     embeddings = model.embed(['test.wav']) #generate embeddings on each 5 sec of audio
     all_outputs = model.forward(['test.wav'], return_value='all') #get all model outputs
     all_outputs['spatial_embedding'].shape # np.array of spatial embeddings
+    ```
+
+    Environment setup: currently only working on Linux with TensorFlow 2.20.0rc0
+    ```
+    pip install --upgrade opensoundscape
+    pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@perch2
+    pip install tensorflow==2.20.0rc0 tensorflow-hub
+    pip install --no-deps tf-keras==0.19.0
     ```
 
     """
