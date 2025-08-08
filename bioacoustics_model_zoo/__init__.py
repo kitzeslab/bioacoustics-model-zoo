@@ -93,14 +93,19 @@ if tf is None:
     class Perch(MissingTFDependency):
         pass
 
+    @register_bmz_model
+    class Perch2(MissingTFDependency):
+        pass
+
 else:
     from bioacoustics_model_zoo.mixit_separation import SeparationModel
     from bioacoustics_model_zoo.yamnet import YAMNet
     from bioacoustics_model_zoo.perch import Perch
+    from bioacoustics_model_zoo.perch_v2 import Perch2
     from bioacoustics_model_zoo import birdnet
     from bioacoustics_model_zoo import mixit_separation
     from bioacoustics_model_zoo import yamnet
-    from bioacoustics_model_zoo import perch
+    from bioacoustics_model_zoo import perch, perch_v2
 
 
 # timm and torchaudio requirement

@@ -114,6 +114,59 @@ scores
 
 # Model list
 
+### [Perch V2]
+
+Classification and embedding model trained on a large set of annotated bird vocalizations
+
+Additional required packages: 
+
+> note that so far, we've only gotten this model working with TF 2.20.0rc0 on Linux + GPU,
+but wider support should be available soon. 
+
+```
+pip install tensorflow[and-cuda]~=2.20.0rc0 tensorflow-hub
+pip install --no-deps tf-keras==2.19.0
+```
+
+Example: 
+
+```python
+import bioacoustics_model_zoo as bmz
+m = bmz.Perch2()
+m.predict(['test.wav']) # returns dataframe of per-class scores
+m.embed(['test.wav']) # returns dataframe of embeddings
+```
+
+Training: 
+
+The `.train()` method trains a shallow fully-connected neural network as a
+classification head while keeping the feature extractor frozen, since the
+Perch2 feature extractor is not trainable.
+
+Please see opensoundscape.org documentation and tutorials for detailed walk
+through. Once you have multi-hot training and validation label dataframes with
+(file, start_time, end_time) multi-index and a column for each class, training
+looks like this:
+
+```python
+# load the pre-trained Perch2 tensorflow model
+m=bmz.Perch2()
+# add a 2-layer PyTorch classification head
+m.initialize_custom_classifier(classes=train_df.columns, hidden_layer_sizes=(100,))
+# embed the training/validation samples with 5 augmented variations each,
+# then fit the classification head
+m.train(
+  train_df,
+  val_df,
+  n_augmentation_variants=5,
+  embedding_batch_size=64,
+  embedding_num_workers=4
+)
+# save the custom Perch2 model to a file
+m.save(save_path)
+# later, to reload your fine-tuned Perch2 from the saved object:
+# m = bmz.Perch2.load(save_path)
+```
 
 ### [BirdNET](https://github.com/kahst/BirdNET-Analyzer)
 
