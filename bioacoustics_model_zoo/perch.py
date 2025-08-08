@@ -55,7 +55,6 @@ class Perch(TensorFlowModelWithPytorchClassifier):
             and /label.csv
 
             Note: adjust `version` argument to match the model version in the local folder
-        cache_dir: optional, over-ride default model caching location
 
     Methods:
         predict: get per-audio-clip per-class scores as pandas DataFrame
@@ -163,7 +162,7 @@ class Perch(TensorFlowModelWithPytorchClassifier):
         self.preprocessor.insert_action(
             action_index="normalize_signal",
             action=Action(
-                opensoundscape.Audio.normalize, is_augmentation=False, peak_level=0.5
+                opensoundscape.Audio.normalize, is_augmentation=False, peak_level=0.25
             ),
         )
 
