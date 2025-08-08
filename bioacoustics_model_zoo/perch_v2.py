@@ -87,8 +87,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     def __init__(self, version=1):
         # only require tensorflow and tensorflow_hub if/when this class is used
         try:
-            import tensorflow as tf
-            import tensorflow_hub
+            import tensorflow_hub as hub
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
                 """Perch2 requires tensorflow and tensorflow_hub packages to be installed. 
@@ -107,7 +106,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
         tfhub_path = f"https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2/{version}"
 
-        from etils import epath
+        from pathlib import Path
         import pandas as pd
 
         # first try hub.load(url): succeeds to download but fails to find file within subfolder
@@ -116,10 +115,10 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         except Exception as e:
             # download may have succeeded
             # try to open from downloaded local path
-            local_path = epath.Path(hub.resolve(tfhub_path)) / "perch_v2"
+            local_path = Path(hub.resolve(tfhub_path)) / "perch_v2"
             tf_model = hub.load(str(local_path))  # or tf.saved_model.load()
         model_path = hub.resolve(tfhub_path)
-        class_lists_glob = (epath.Path(model_path) / "perch_v2/assets").glob("*.csv")
+        class_lists_glob = (Path(model_path) / "perch_v2/assets").glob("*.csv")
         class_lists = {}
         for class_list_path in class_lists_glob:
             try:
@@ -194,7 +193,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 ['embedding', 'spatial_embedding', 'label', 'spectrogram']
         """
 
-        model_outputs = model.signatures["serving_default"](inputs=batch_data)
+        model_outputs = self.tf_model.signatures["serving_default"](inputs=batch_data)
 
         # move tensorflow tensors to CPU and convert to numpy
         outs = {k: None if v is None else v.numpy() for k, v in model_outputs.items()}
