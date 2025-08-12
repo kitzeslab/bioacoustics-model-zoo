@@ -54,7 +54,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     (see https://www.tensorflow.org/hub/caching#caching_of_compressed_downloads)
 
     Args:
-        version: [default: 1] currently only supported version is 1 (Perch v2.0)
+        version: [default: 2] select from released versions of Perch v2.0 on Kaggle
 
     Methods:
         predict: get per-audio-clip per-class scores as pandas DataFrame
@@ -82,7 +82,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
     """
 
-    def __init__(self, version=1):
+    def __init__(self, version=2):
         # only require tensorflow and tensorflow_hub if/when this class is used
         try:
             import tensorflow_hub as hub
@@ -95,7 +95,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 """
             ) from exc
 
-        tested_versions = (1,)
+        tested_versions = (1, 2)
         if not version in tested_versions:
             warnings.warn(
                 f"version {version} has not been tested, tested versions: {tested_versions}"
