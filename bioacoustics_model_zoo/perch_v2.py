@@ -55,6 +55,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
     Args:
         version: [default: 2] select from released versions of Perch v2.0 on Kaggle
+            Note that this is not the "2" in Perch2, but the version of the Perch2 release.
 
     Methods:
         predict: get per-audio-clip per-class scores as pandas DataFrame
@@ -73,6 +74,8 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     ```
 
     Environment setup: currently only working on Linux with TensorFlow 2.20.0rc0
+    Once stable versions of Tensorflow >=2.20.0 are available, they should also work
+    (likewise for tf-keras >=0.20.0)
     ```
     pip install --upgrade opensoundscape
     pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@perch2
@@ -95,7 +98,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 """
             ) from exc
 
-        tested_versions = (1, 2)
+        tested_versions = (2,)
         if not version in tested_versions:
             warnings.warn(
                 f"version {version} has not been tested, tested versions: {tested_versions}"
@@ -111,12 +114,11 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         try:
             tf_model = hub.load(tfhub_path)
         except Exception as e:
-            # download may have succeeded
-            # try to open from downloaded local path
-            local_path = Path(hub.resolve(tfhub_path)) / "perch_v2"
-            tf_model = hub.load(str(local_path))  # or tf.saved_model.load()
+            raise RuntimeError(
+                f"Failed to load Perch2 model from TensorFlow Hub at {tfhub_path}. "
+            ) from e
         model_path = hub.resolve(tfhub_path)
-        class_lists_glob = (Path(model_path) / "perch_v2/assets").glob("*.csv")
+        class_lists_glob = (Path(model_path) / "assets").glob("*.csv")
         class_lists = {}
         for class_list_path in class_lists_glob:
             try:
