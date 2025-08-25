@@ -68,15 +68,20 @@ class MissingTFLiteDependency:
 
 
 # tflite requirement
-if ai_edge_litert is None:
+if ai_edge_litert is None and tensorflow is None:
 
     @register_bmz_model
     class BirdNET(MissingTFLiteDependency):
 
         pass
 
+    @register_bmz_model
+    class BirdNETOccurrenceModel(MissingTFLiteDependency):
+
+        pass
+
 else:
-    from bioacoustics_model_zoo.birdnet import BirdNET
+    from bioacoustics_model_zoo.birdnet import BirdNET, BirdNETOccurrenceModel
 
 # tensorflow requirement
 if tf is None:

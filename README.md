@@ -220,6 +220,22 @@ m.save(save_path)
 # m = bmz.BirdNET.load(save_path)
 ```
 
+### [BirdNET Occurrence Model](https://github.com/kahst/BirdNET-Analyzer)
+
+Predict the probability of observing bird species at a location and week of the year based on eBird occurrence data
+
+Example:
+
+
+```python
+# download and initialize the model
+from bioacoustics_model_zoo import BirdNETOccurrenceModel
+occurrence_model=BirdNETOccurrenceModel()
+
+# get a dataframe listing species likely to occur at a location and week of the year,
+# keeping species only with a relative occurrence probability of 10%
+occurrence_model.get_species_list(lat=37.419871, lon=-119.153168,week=34,threshold=.1)
+```
 
 ### [Perch](https://tfhub.dev/google/bird-vocalization-classifier/4): 
 

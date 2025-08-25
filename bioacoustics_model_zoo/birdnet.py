@@ -91,11 +91,18 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         # only require tensorflow if/when this class is used
         try:
             import ai_edge_litert.interpreter as tflite
+
+            resolver = tflite.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES
         except ModuleNotFoundError as exc:
-            raise ModuleNotFoundError(
-                "BirdNet requires tensorflow package to be installed. "
-                "Install in your python environment with `pip install tensorflow`"
-            ) from exc
+            try:
+                from tensorflow import lite as tflite
+
+                resolver = tflite.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES
+            except ModuleNotFoundError as exc:
+                raise ModuleNotFoundError(
+                    "BirdNet requires tensorflow package to be installed. "
+                    "Install in your python environment with `pip install tensorflow`"
+                ) from exc
 
         # load class list:
         if label_url.startswith("http"):
@@ -141,7 +148,7 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         self.tf_model = tflite.Interpreter(
             model_path=model_path,
             num_threads=num_tflite_threads,
-            experimental_op_resolver_type=tflite.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES,
+            experimental_op_resolver_type=resolver,
         )
         self.tf_model.allocate_tensors()
 
@@ -314,3 +321,163 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
             return embeddings, preds
         else:
             return embeddings
+
+
+@register_bmz_model
+class BirdNETOccurrenceModel:
+    """Predict probability of bird species at week, lat, lon
+
+    based on eBird checklist data
+
+    adapted from BirdNET-Analyzer occurrence meta-model on GitHub
+
+    Args:
+        checkpoint_url: url to .tflite checkpoint on GitHub, or a local path to the .tflite file
+        label_url: url to .txt file with class labels, or a local path to the .txt file
+        num_tflite_threads: number of threads for TFLite interpreter
+        cache_dir: directory to cache downloaded files (uses default cache if None)
+
+    Returns:
+        model object with methods for generating species probabilities and species lists
+
+    Example:
+
+    ```python
+    from bioacoustics_model_zoo import BirdNETOccurrenceModel
+    m=BirdNETOccurrenceModel()
+    m.get_species_list(lat=37.419871, lon=-119.153168,week=20,threshold=.1)
+    ```
+    """
+
+    def __init__(
+        self,
+        checkpoint_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_MData_Model_V2_FP16.tflite",
+        label_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt",
+        num_tflite_threads=1,
+        cache_dir=None,
+    ):
+        # only require tensorflow if/when this class is used
+        try:
+            import ai_edge_litert.interpreter as tflite
+
+            resolver = tflite.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES
+        except ModuleNotFoundError as exc:
+            try:
+                from tensorflow import lite as tflite
+
+                resolver = tflite.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES
+            except ModuleNotFoundError as exc:
+                raise ModuleNotFoundError(
+                    "BirdNet requires tensorflow package to be installed. "
+                    "Install in your python environment with `pip install tensorflow`"
+                ) from exc
+
+        self.version = "2.4"
+
+        # load class list:
+        if label_url.startswith("http"):
+            label_path = download_cached_file(
+                label_url,
+                filename=None,
+                model_name="birdnet",
+                model_version=self.version,
+                cache_dir=cache_dir,
+            )
+        else:
+            label_path = label_url
+        label_path = Path(label_path).resolve()  # get absolute path
+        assert label_path.exists(), f"Label path {label_path} does not exist"
+
+        # labels.txt is a single column of class names without a header
+        self.classes = pd.read_csv(label_path, header=None)[0].values
+
+        self.scientific_names = [c.split("_")[0] for c in self.classes]
+        self.common_names = [c.split("_")[1] for c in self.classes]
+
+        # download model if URL, otherwise find it at local path:
+        if checkpoint_url.startswith("http"):
+            print("downloading model from URL...")
+            model_path = download_cached_file(
+                checkpoint_url,
+                filename=None,
+                model_name="birdnet",
+                model_version=self.version,
+                cache_dir=cache_dir,
+            )
+        else:
+            model_path = checkpoint_url
+
+        model_path = str(Path(model_path).resolve())  # get absolute path as string
+        assert Path(model_path).exists(), f"Model path {model_path} does not exist"
+
+        self.interpreter = tflite.Interpreter(
+            model_path=model_path,
+            num_threads=num_tflite_threads,
+            # XNNPACK disabled, because it does not support variable inputsize anyway (ie batchsize)
+            experimental_op_resolver_type=resolver,
+        )
+        self.interpreter.allocate_tensors()
+        self.input_layer_index = self.interpreter.get_input_details()[0]["index"]
+        self.output_layer_index = self.interpreter.get_output_details()[0]["index"]
+
+    def species_probabilities(self, lat, lon, week):
+        """Predicts the probability for each species at lat/lon/week.
+
+        Args:
+            lat: The latitude.
+            lon: The longitude.
+            week: The week of the year [1-48]. Use -1 for yearlong.
+
+        Returns:
+            A list of probabilities for all species.
+        """
+
+        # Prepare mdata as sample
+        sample = np.expand_dims(np.array([lat, lon, week], dtype="float32"), 0)
+
+        # Run inference
+        self.interpreter.set_tensor(self.input_layer_index, sample)
+        self.interpreter.invoke()
+
+        return self.interpreter.get_tensor(self.output_layer_index)[0]
+
+    def get_species_list(
+        self,
+        lat=-1,
+        lon=-1,
+        week=-1,
+        threshold=0.03,
+    ):
+        """Predicts the species list at the coordinates and week of year, based on occurrence threshold
+
+        Predicts the species list based on the coordinates and week of year.
+
+        Note that the probability is relative to the most common species rather than absolute occurrence rate.
+
+        Args:
+            lat (float, optional): Latitude of the location for species filtering. Defaults to -1 (no filtering by location).
+            lon (float, optional): Longitude of the location for species filtering. Defaults to -1 (no filtering by location).
+            week (int, optional): Week of the year for species filtering. Defaults to -1 (no filtering by time).
+            threshold (float, optional): Species frequency threshold for filtering. Defaults to 0.03.
+
+        Returns:
+            A sorted dataframe with columns: scientific_name, common_name, probability
+        """
+        # Make species probability prediction
+        species_probs = self.species_probabilities(lat, lon, week)
+
+        species_df = pd.DataFrame(
+            {
+                "scientific_name": self.scientific_names,
+                "common_name": self.common_names,
+                "relative_probability": species_probs,
+            }
+        )
+
+        # Apply threshold
+        filtered_df = species_df[species_df["relative_probability"] >= threshold]
+
+        # Sort by relative probability and return
+        return filtered_df.sort_values(
+            by="relative_probability", ascending=False
+        ).reset_index(drop=True)
