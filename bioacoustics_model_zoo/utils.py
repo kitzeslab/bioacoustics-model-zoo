@@ -145,6 +145,105 @@ def download_cached_file(
     return Path(downloaded_path)
 
 
+from github import Github
+import os
+
+
+def download_subfolder(
+    repo_full_name,
+    subfolder_path,
+    local_dir,
+    token=None,
+    verbose=True,
+    redownload_existing=False,
+):
+    """
+    Download a subfolder from a GitHub repo using PyGithub and a custom download_file helper.
+
+    Args:
+        repo_full_name (str): e.g., "owner/repo"
+        subfolder_path (str): path within repo, e.g., "src/utils"
+        local_dir (str): local directory to save files
+        download_file (callable): function(url, save_dir, **kwargs) -> None
+        token (str, optional): GitHub personal access token
+        verbose (bool): print progress
+        redownload_existing (bool): force re-download even if file exists
+    """
+    g = Github(token) if token else Github()
+    repo = g.get_repo(repo_full_name)
+
+    def _download_dir_contents(path, local_path):
+        os.makedirs(local_path, exist_ok=True)
+        contents = repo.get_contents(path)
+
+        for content in contents:
+            if content.type == "dir":
+                # recurse into subdirectory
+                _download_dir_contents(
+                    content.path, os.path.join(local_path, content.name)
+                )
+            else:
+                # use download_url directly
+                file_save_dir = os.path.join(local_path)
+                os.makedirs(file_save_dir, exist_ok=True)
+                downloaded_path = download_file(
+                    content.download_url,
+                    save_dir=file_save_dir,
+                    verbose=verbose,
+                    redownload_existing=redownload_existing,
+                )
+                if verbose:
+                    print(f"Downloaded {content.path}")
+
+    _download_dir_contents(subfolder_path, local_dir)
+
+
+def download_cached_subfolder(
+    repo_full_name,
+    subfolder_path,
+    model_name,
+    model_version=None,
+    cache_dir=None,
+    verbose=False,
+    redownload_existing=False,
+):
+    """Download a subfolder of github repo to cache directory if not already cached.
+
+    Args:
+        repo_full_name (str): e.g., "owner/repo"
+        subfolder_path (str): path within repo of subfolder to download, e.g., "src/utils"
+        model_name (str): Name of the model for cache organization
+        model_version (str): Version of the model for cache organization
+            - if specified, does not consider model to be cached if version mismatches
+            and stores model in [cache_dir]/[model_name]/[model_version]/
+            - if not specified, assumes model has not changed versions and
+            stores model in [cache_dir]/[model_name]/
+        cache_dir (str or Path, optional): Override cache directory
+        verbose (bool): Print download messages
+        redownload_existing (bool): Re-download even if file exists
+
+    Returns:
+        Path: Path to the cached file
+    """
+    from bioacoustics_model_zoo.cache import get_model_cache_dir
+
+    # Download to cache directory
+    model_cache_dir = get_model_cache_dir(
+        model_name, model_version=model_version, cache_dir=cache_dir
+    )
+    save_path = Path(model_cache_dir) / Path(subfolder_path).name
+    os.makedirs(save_path, exist_ok=True)
+    download_subfolder(
+        repo_full_name=repo_full_name,
+        subfolder_path=subfolder_path,
+        local_dir=str(save_path),
+        verbose=verbose,
+        redownload_existing=redownload_existing,
+    )
+
+    return save_path
+
+
 def collate_to_np_array(audio_samples):
     """
     takes list of AudioSample objects with type(sample.data)==opensoundscape.Audio

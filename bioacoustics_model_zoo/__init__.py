@@ -102,6 +102,10 @@ if tf is None:
     class Perch2(MissingTFDependency):
         pass
 
+    @register_bmz_model
+    class Nighthawk(MissingTFDependency):
+        pass
+
 else:
     from bioacoustics_model_zoo.mixit_separation import SeparationModel
     from bioacoustics_model_zoo.yamnet import YAMNet
@@ -111,6 +115,8 @@ else:
     from bioacoustics_model_zoo import mixit_separation
     from bioacoustics_model_zoo import yamnet
     from bioacoustics_model_zoo import perch, perch_v2
+    from bioacoustics_model_zoo import nighthawk
+    from bioacoustics_model_zoo.nighthawk import Nighthawk
 
 
 # timm and torchaudio requirement

@@ -373,6 +373,20 @@ separated = model.separate_audio(a)
 model.load_separate_write('./temp.wav')
 ```
 
+### [Nighthawk](https://github.com/bmvandoren/Nighthawk):
+
+Classification model for North American avian nocturnal flight calls
+
+Additional required packages: `tensorflow`
+
+Example:
+```python
+import bioacoustics_model_zoo as bmz
+m = bmz.Nighthawk()
+results = m.predict(['test.wav']) 
+results['species'] # dataframe of per-species, per-1s-clip confidence scores
+```
+
 ### [YAMNet](https://tfhub.dev/google/yamnet/1): 
 
 Embedding model trained on AudioSet YouTube
