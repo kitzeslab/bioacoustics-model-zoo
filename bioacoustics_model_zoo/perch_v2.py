@@ -80,7 +80,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     pip install --upgrade opensoundscape
     pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@perch2
     pip install tensorflow==2.20.0rc0[and-cuda] tensorflow-hub
-    pip install --no-deps tf-keras==0.19.0
+    pip install --no-deps tf-keras==2.19.0
     ```
 
     """
