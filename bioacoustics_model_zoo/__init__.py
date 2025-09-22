@@ -68,7 +68,7 @@ class MissingTFLiteDependency:
 
 
 # tflite requirement
-if ai_edge_litert is None and tensorflow is None:
+if ai_edge_litert is None and tf is None:
 
     @register_bmz_model
     class BirdNET(MissingTFLiteDependency):
