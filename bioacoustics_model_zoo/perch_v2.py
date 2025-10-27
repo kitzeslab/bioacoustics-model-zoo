@@ -34,6 +34,10 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     [Perch v2](https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2)
     is shared under the [Apache 2.0 License](https://opensource.org/license/apache-2-0/).
 
+    Note: different model checkpoints are downloaded depending on whether `torch.cuda.is_available()`
+    is True or False. If true, the default, GPU-only model is downloaded. If false, a CPU-compatible
+    model is downloaded. The type of model loaded is indicated by `self.system` attribute.
+
     The model can be used to classify sounds from about 15,000 species (10,000 are birds), or
     to generate feature embeddings for audio files. It was trained on recordings from Xeno Canto
     and iNaturalist Sounds.
@@ -54,8 +58,9 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     (see https://www.tensorflow.org/hub/caching#caching_of_compressed_downloads)
 
     Args:
-        version: [default: 2] select from released versions of Perch v2.0 on Kaggle
-            Note that this is not the "2" in Perch2, but the version of the Perch2 release.
+        version: select from released versions of Perch v2.0 on Kaggle
+            Default: None currently selects "2" for GPU-compatible model or
+            "1" for CPU-compatible model (latest as of October 2025).
 
     Methods:
         predict: get per-audio-clip per-class scores as pandas DataFrame
@@ -73,39 +78,47 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     all_outputs['spatial_embedding'].shape # np.array of spatial embeddings
     ```
 
-    Environment setup: currently only working on Linux with TensorFlow 2.20.0rc0
-    Once stable versions of Tensorflow >=2.20.0 are available, they should also work
-    (likewise for tf-keras >=0.20.0)
-    ```
-    pip install --upgrade opensoundscape
-    pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@perch2
-    pip install tensorflow==2.20.0rc0[and-cuda] tensorflow-hub
-    pip install --no-deps tf-keras==2.19.0
-    ```
+    Environment setup:
 
+    Perch2 requires tensorflow >=2.20.0
+    ```
+    pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow tensorflow-hub
+    ```
     """
 
-    def __init__(self, version=2):
+    def __init__(self, version=None):
         # only require tensorflow and tensorflow_hub if/when this class is used
         try:
             import tensorflow_hub as hub
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
-                """Perch2 requires tensorflow and tensorflow_hub packages to be installed. 
-                Install in your python environment with 
-                `pip install tensorflow[and-cuda]~=2.20.0rc0` (for linux w GPU support)
-                or `pip install tensorflow~=2.20.0rc0`
+                """Perch2 requires tensorflow and tensorflow_hub packages >=2.20.0.
+                Please install them using:
+                pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow tensorflow-hub
                 """
             ) from exc
 
-        tested_versions = (2,)
+        # which model to load depends on whether GPU is available
+        if torch.cuda.is_available():
+            system = "GPU"
+            if version is None:
+                version = 2  # latest GPU-compatible as of Oct 2025
+            tested_versions = (2,)
+
+            tfhub_path = f"https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2/{version}"
+        else:
+            system = "CPU"
+            if version is None:
+                version = 1  # latest CPU-compatible as of Oct 2025
+            tested_versions = (1,)
+            tfhub_path = f"https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2_cpu/{version}"
+
         if not version in tested_versions:
             warnings.warn(
-                f"version {version} has not been tested, tested versions: {tested_versions}"
+                f"version {version} has not been tested on {system}, tested versions: {tested_versions}"
             )
         self.version = version
-
-        tfhub_path = f"https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2/{version}"
+        self.system = system
 
         from pathlib import Path
         import pandas as pd

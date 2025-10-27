@@ -114,18 +114,18 @@ scores
 
 # Model list
 
-### [Perch V2]
+### [Perch V2](https://www.kaggle.com/models/google/bird-vocalization-classifier)
 
 Classification and embedding model trained on a large set of annotated bird vocalizations
 
-Additional required packages: 
+Preprint:
+> van Merriënboer, B., Dumoulin, V., Hamer, J., Harrell, L., Burns, A., & Denton, T. (2025). Perch 2.0: The Bittern Lesson for Bioacoustics. arXiv preprint arXiv:2508.04665.
 
-> note that so far, we've only gotten this model working with TF 2.20.0rc0 on Linux + GPU,
-but wider support should be available soon. 
+
+Perch2 requires tensorflow >=2.20.0. For instance, update to the latest versions using:
 
 ```
-pip install tensorflow[and-cuda]~=2.20.0rc0 tensorflow-hub
-pip install --no-deps tf-keras==2.19.0
+pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow tensorflow-hub
 ```
 
 Example: 
