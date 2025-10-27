@@ -2,7 +2,7 @@
 Pre-trained models for bioacoustic classification tasks
 
 Suggested Citation
-> Lapp, S., and Kitzes, J., 2025. "Bioacoustics Model Zoo version 0.11.0". https://github.com/kitzeslab/bioacoustics-model-zoo
+> Lapp, S., and Kitzes, J., 2025. "Bioacoustics Model Zoo version 0.12.2". https://github.com/kitzeslab/bioacoustics-model-zoo
 
 
 ## Set up / Installation
@@ -47,7 +47,7 @@ pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo
 
 For a specific version:
 ```bash
-pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@0.11.0
+pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@0.12.2
 ```
 
 3. Install additional dependencies as needed:

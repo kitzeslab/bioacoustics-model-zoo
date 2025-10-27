@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bioacoustics-model-zoo"
-version = "0.12.1"
+version = "0.12.2"
 description = "Public repository of machine learning models for bioacoustics, with OpenSoundscape integration"
 authors = ["sammlapp <sammlapp@gmail.com>"]
 readme = "README.md"
@@ -28,13 +28,13 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.9, <3.13"
 opensoundscape = ">=0.11.2"
 PyGithub = ">=2.6.1"
 
 # Optional dependencies for specific models
-tensorflow = {version = ">=2.13.0", optional = true}
-tensorflow-hub = {version = ">=0.14.0", optional = true}
+tensorflow = {version = ">=2.20.0", optional = true}
+tensorflow-hub = {version = ">=0.16.1", optional = true}
 ai-edge-litert = {version = ">=1.0.0,<1.4", optional = true}
 torch = {version = ">=1.13.0", optional = true}
 torchvision = {version = ">=0.14.0", optional = true}
@@ -44,6 +44,7 @@ transformers = {version = ">=4.20.0", optional = true}
 
 [tool.poetry.extras]
 tensorflow = ["tensorflow", "tensorflow-hub"]
+perch = ["tensorflow", "tensorflow-hub"]
 birdnet = ["ai-edge-litert"]
 hawkears = ["torch", "torchvision", "torchaudio", "timm"]
 birdset = ["torch", "torchvision", "torchaudio", "transformers"]
