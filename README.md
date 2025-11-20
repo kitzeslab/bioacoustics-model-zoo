@@ -27,6 +27,7 @@ pip install bioacoustics-model-zoo[hawkears]  # For HawkEars models
 pip install bioacoustics-model-zoo[birdnet]   # For BirdNET model
 pip install bioacoustics-model-zoo[tensorflow] # For TensorFlow models (Perch, YAMNet)
 pip install bioacoustics-model-zoo[birdset]   # For BirdSet models
+pip install bioacoustics-model-zoo[perch]   # For Perch models
 
 # Install all optional dependencies
 pip install bioacoustics-model-zoo[all]
