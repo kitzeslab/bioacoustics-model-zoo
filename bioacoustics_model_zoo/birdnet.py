@@ -75,7 +75,7 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
 
         Methods:
             predict: get per-audio-clip per-class scores in dataframe format; includes WandB logging
-                (inherited from BaseClassifier)
+                (inherited from opensoundscape.SpectrogramClassifier)
             embed: make embeddings for audio data (feature vectors from penultimate layer)
 
         Example:

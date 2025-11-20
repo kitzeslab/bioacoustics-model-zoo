@@ -9,7 +9,7 @@ import opensoundscape
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
-from opensoundscape.ml.cnn import BaseClassifier
+from opensoundscape.ml.cnn import BaseModule
 from opensoundscape import Audio, Action
 
 from bioacoustics_model_zoo.utils import register_bmz_model
@@ -38,7 +38,7 @@ class YAMNetDataloader(SafeAudioDataloader):
 
 
 @register_bmz_model
-class YAMNet(BaseClassifier):
+class YAMNet(BaseModule):
     def __init__(self, url="https://tfhub.dev/google/yamnet/1", input_duration=60):
         """load YAMNet Audio CNN from tensorflow hub
 
