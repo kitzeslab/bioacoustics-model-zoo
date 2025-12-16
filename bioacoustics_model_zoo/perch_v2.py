@@ -483,7 +483,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         self,
         samples,
         db,
-        dataset_name,
+        deployment_id=None,
         progress_bar=True,
         audio_root=None,
         embedding_exists_mode="skip",  # skip, error, add
@@ -498,9 +498,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             db: a hoplite database object or a path to a hoplite database folder
                 - if a path is provided, the database will be created if it does not exist
                 - when creating a new db, the embedding_dim argument must be provided
-            dataset_name: name of the dataset to save embeddings within
-                - if the dataset does not exist in the db, it will be created
-                - one hoplite database can contain multiple datasets
+            deployment_id: a hoplite db deployment table ID to associate with all inserted embeddings
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
             audio_root: the root directory for relative paths to audio files
             embedding_exists_mode: str, behavior when an embedding already exists for a given
@@ -551,18 +549,26 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
             # check if each exists
             keep_idxs = []
-            for i, (file, start_time, _) in enumerate(index_values):
-                matching_ids = db.get_embeddings_by_source(
-                    dataset_name=dataset_name,
-                    source_id=str(file),
-                    offsets=np.array([start_time], dtype=np.float16),
+            from ml_collections import config_dict
+
+            for i, (file, start_time, end_time) in enumerate(index_values):
+                matching_ids = db.match_window_ids(
+                    # deployments_filter=config_dict.create(
+                    #     eq=dict(project="project"),
+                    # ),
+                    recordings_filter=config_dict.create(
+                        eq=dict(filename=file),
+                    ),
+                    windows_filter=config_dict.create(
+                        eq=dict(offsets=np.array([start_time,end_time], np.float16)),
+                    ),
                 )
                 if len(matching_ids) == 0:
                     keep_idxs.append(i)
                 elif embedding_exists_mode == "error":
                     # don't allow adding or skipping duplicated entries
                     raise ValueError(
-                        f"Embedding already exists for {file}:{start_time} in dataset {dataset_name}"
+                        f"Embedding already exists for {file}:{start_time}-{end_time}"
                         " and embedding_exists_mode='error'. Other options are 'skip' or 'add'. "
                     )
 
@@ -577,6 +583,16 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 print("all samples already have embeddings in the database")
                 return db, {}
         # elif embedding_exists_mode == "add": # do nothing, allow duplicates
+
+        # add all files to the metadata, retaining the deployment_id in the database
+        recording_ids = {}
+        files = dataloader.dataset.dataset.label_df.index.get_level_values(0).tolist()
+        for file in files:
+            recording_ids[file] = db.insert_recording(
+                filename=file,
+                deployment_id=deployment_id, # TODO
+                # datetime=file_start_timestamp, # TODO
+            )
 
         # disable gradient updates during inference
         for i, batch_samples in enumerate(tqdm(dataloader, disable=not progress_bar)):
@@ -613,13 +629,12 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                     # use the relative path for the source name stored in the db
                     file = str(Path(file).relative_to(audio_root))
                 start_time = batch_samples[j].start_time
-
-                emb_source = hoplite_interface.EmbeddingSource(
-                    dataset_name=dataset_name,
-                    source_id=file,
-                    offsets=np.array([start_time], np.float16),
+                duration = batch_samples[j].duration
+                window_id = db.insert_window(
+                    recording_id=recording_ids[file],
+                    offsets=np.array([start_time,start_time+duration], np.float16),
+                    embedding=batch_emb[j],
                 )
-                db.insert_embedding(batch_emb[j], emb_source)
 
             # commit once per commit_frequency_batches batches
             # committing is relatively slow, but we don't want to lose progress if interrupted
@@ -634,7 +649,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         # return database object and info about any failed samples
         return (db, {"failed_samples": dataloader.dataset.report()})
 
-    def similarity_search_hoplite_db(
+    def similarity_search_hoplite_db( #TODO out of date
         self,
         query_samples,
         db,
