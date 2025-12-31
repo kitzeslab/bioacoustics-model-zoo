@@ -3,26 +3,14 @@ from bioacoustics_model_zoo.tensorflow_wrapper import (
     TensorFlowModelWithPytorchClassifier,
 )
 
-from pathlib import Path
-
 import pandas as pd
-import numpy as np
-import urllib
 import torch
 import warnings
 
 import opensoundscape
 from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
-from opensoundscape.ml.dataloaders import SafeAudioDataloader
-from tqdm.autonotebook import tqdm
-from opensoundscape import Action, Audio, CNN
-from opensoundscape.ml.dataloaders import SafeAudioDataloader
-from opensoundscape.ml.cnn import load_or_create_hoplite_usearch_db
-import opensoundscape as opso
-from opensoundscape.sample import collate_audio_samples
-
+from opensoundscape import Action, Audio
 from bioacoustics_model_zoo.utils import (
-    collate_to_np_array,
     AudioSampleArrayDataloader,
     register_bmz_model,
 )
@@ -89,6 +77,10 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow tensorflow-hub
     ```
     """
+
+    similarity_search_hoplite_db = (
+        opensoundscape.ml.cnn.SpectrogramClassifier.similarity_search_hoplite_db
+    )
 
     def __init__(self, version=None):
         # only require tensorflow and tensorflow_hub if/when this class is used
@@ -190,145 +182,47 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             ),
         )
 
-    def _batch_forward(
-        self, batch_data, return_dict=False, apply_custom_classifier=False
+    def batch_forward(
+        self,
+        batch_data,
+        targets=("embedding", "spatial_embedding", "label", "spectrogram"),
+        avgpool=False,
     ):
         """run inference on a single batch of samples
 
-        Returned logits depend on self.use_custom_classifier: if False, returns
-        logits from the TensorFlow model. If True, returns logits from the
-        custom classifier (self.network)
+        Returns a dictionary of outputs for the each target
 
         Args:
             batch_data: np.array of audio samples, shape (batch_size, 32000*5)
-            return_dict: bool, if True, returns a dictionary of all outputs
-                [default: False] return (embeddings, logits)
-                if True, returns dictionary with keys:
+            targets: tuple of str, select from
                 ['embedding', 'spatial_embedding', 'label', 'spectrogram','custom_classifier_logits']
-            apply_custom_classifier: [default: False] if True, run self.network(embeddings)
-                to generate 'custom_classifier_logits' output
-
+                - 'custom_classifier_logits' is the result of self.network() on the embeddings
+            avgpool: ignored
         Returns:
-            if return_dict=False: tuple (embeddings, logits)
-            if return_dict=True: dictionary with keys:
-                ['embedding', 'spatial_embedding', 'label', 'spectrogram','custom_classifier_logits']
+            dict with keys matching targets, values are np.arrays of outputs
         """
+
         model_outputs = self.tf_model.signatures["serving_default"](inputs=batch_data)
 
+        # opensoundscape uses reserved key -1 for model outputs e.g. during .predict()
+        if -1 in targets:
+            model_outputs[-1] = model_outputs["logits"]
         # move tensorflow tensors to CPU and convert to numpy
-        outs = {k: None if v is None else v.numpy() for k, v in model_outputs.items()}
+        # only retaining requested outputs
+        outs = {
+            k: None if v is None else v.numpy()
+            for k, v in model_outputs.items()
+            if k in targets
+        }
 
-        if apply_custom_classifier:
+        if "custom_classifier_logits" in targets:
             emb_tensor = torch.tensor(outs["embedding"]).to(self.device)
             self.network.to(self.device)
             outs["custom_classifier_logits"] = (
                 self.network(emb_tensor).detach().cpu().numpy()
             )
 
-        if return_dict:
-            return outs
-        else:  # return embeddings, logits
-            # which logits depends on self.use_custom_classifier
-            # (True: custom classifier ie self.network, False: original Perch2 logits)
-            if self.use_custom_classifier:
-                return outs["embedding"], outs["custom_classifier_logits"]
-            return outs["embedding"], outs["label"]
-
-    def __call__(
-        self,
-        dataloader,
-        wandb_session=None,
-        progress_bar=True,
-        return_values=None,
-    ):
-        """run forward pass of model, iterating through dataloader batches
-
-        The output can take several forms since it depends both on `return_value` and
-        on self.use_custom_classifier. See details below.
-
-        Args:
-            dataloader: instance of SafeAudioDataloader or custom subclass
-            wandb_session: wandb.Session object, if provided, logs progress
-            progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
-            return_values: tuple(str,): select from 'logits', 'embeddings', 'spatial_embeddings','spectrograms'
-                [default:  None] returns logits from custom classifier (self.network) if
-                    self.use_custom_classifier=True, otherwise returns Perch2 class logits
-                Include any combination of the following:
-                - 'logits': logit scores (class predictions) on the species classes
-                - 'embeddings': 1D feature vectors from the penultimate layer of the network
-                - 'spatial_embeddings': un-pooled spatial embeddings from the network
-                - 'spectrograms': log-mel spectrograms generated during preprocessing
-                - 'custom_classifier_logits': outputs of the custom classifier head
-
-        Returns:
-            - return_values=None: returns outputs of custom classifier
-                (if self.use_custom_classifier=True), otherwise returns Perch2 logits
-            - return_values specified: dictionary of requested outputs, with keys matching return_values
-
-
-        """
-        # check return_value argument is valid
-        return_value_options = (
-            "logits",
-            "embeddings",
-            "spatial_embeddings",
-            "spectrograms",
-            "custom_classifier_logits",
-        )
-        if return_values is None:
-            if self.use_custom_classifier:
-                _return_values = ("custom_classifier_logits",)
-            else:
-                _return_values = ("logits",)
-        else:  # check return values are from supported list
-            assert all(
-                rv in return_value_options for rv in return_values
-            ), f"return_values must be a tuple with any of {return_value_options}, got {return_values}"
-            _return_values = return_values
-
-        # iterate batches, running inference on each
-        # only aggregate requested outputs to save memory
-        returns = {k: [] for k in return_value_options if k in _return_values}
-        for i, (samples_batch, _) in enumerate(
-            tqdm(dataloader, disable=not progress_bar)
-        ):
-            # _batch_forward returns dict with tf model outputs + custom classifier
-            # logits if self.use_custom_classifier=True
-            outs = self._batch_forward(
-                samples_batch,
-                return_dict=True,
-                apply_custom_classifier=("custom_classifier_logits" in _return_values),
-            )
-
-            # only aggregate the outputs requested to save memory
-            if "logits" in _return_values:
-                returns["logits"].extend(outs["label"].tolist())
-            if "custom_classifier_logits" in _return_values:
-                returns["custom_classifier_logits"].extend(
-                    outs["custom_classifier_logits"].tolist()
-                )
-            if "embeddings" in _return_values:
-                returns["embeddings"].extend(outs["embedding"].tolist())
-            if "spatial_embeddings" in _return_values:
-                returns["spatial_embeddings"].extend(outs["spatial_embedding"].tolist())
-            if "spectrograms" in _return_values:
-                returns["spectrograms"].extend(outs["spectrogram"].tolist())
-
-            if wandb_session is not None:
-                wandb_session.log(
-                    {
-                        "progress": i / len(dataloader),
-                        "completed_batches": i,
-                        "total_batches": len(dataloader),
-                    }
-                )
-
-        if return_values is None:  # just return one set of values
-            if self.use_custom_classifier:
-                return np.array(returns["custom_classifier_logits"])
-            else:
-                return np.array(returns["logits"])
-        return {k: np.array(v) for k, v in returns.items()}
+        return outs
 
     def forward(
         self,
@@ -340,11 +234,13 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         **dataloader_kwargs,
     ):
         """
-        Run inference on a list of samples, returning all outputs as a dictionary
+        Run inference on a list of samples, returning all selected outputs as a dictionary
 
-        wraps self.predict_dataloader() and self.__call__() to run the model on audio files/clips
+        use "custom_classifier_logits" in return_values to get outputs from the
+        custom classifier head (self.network)
 
-        then optionally places 1D outputs in dataframes
+        wraps self.predict_dataloader() and self.__call__() to run the model on
+        audio files/clips, then optionally places 1D outputs in dataframes
 
         Args:
             samples: list of file paths, OR pd.DataFrame with index containing audio file paths
@@ -388,6 +284,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         )
 
         # optionally put 1D outputs in DataFrames with multi-index ('file','start_time','end_time')
+        # and appropriate column names
         if return_dfs:
             if "logits" in results_dict:
                 results_dict["logits"] = pd.DataFrame(
@@ -410,364 +307,16 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
         return results_dict
 
-    def embed(
-        self,
-        samples,
-        progress_bar=True,
-        return_preds=False,
-        return_dfs=True,
-        wandb_session=None,
-        **dataloader_kwargs,
-    ):
-        """
-        Generate embeddings for audio files/clips
-
-        Matches API of opensoundscape.SpectrogramClassifier/CNN classes
-
-        Wraps .forward(), selecting embedding and possibly logits as outputs
-
-        Note: when return_preds=True, values returned depend on self.use_custom_classifier:
-            - if True, returns outputs of self.network()
-            - if False, returns original Perch2 class logits
-
+    def _check_or_get_default_embedding_layer(self, target_layer=None):
+        """only allows 'embedding' or 'spatial_embedding' as target layers
         Args:
-            samples: same as CNN.predict(): list of file paths, OR pd.DataFrame with index
-                containing audio file paths, OR a pd.DataFrame with multi-index (file, start_time,
-                end_time)
-            progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
-            return_preds: bool, if True, returns two outputs (embeddings, logits)
-                - logits are Perch2 class logits if self.use_custom_classifier=False,
-                and self.network() outputs if self.use_custom_classifier=True
-            return_dfs: bool, if True, returns embeddings as pd.DataFrame with multi-index like
-                .predict(). if False, returns np.array of embeddings [default: True].
-            wandb_session: [default: None] a weights and biases session object
-            **dataloader_kwargs are passed to self.predict_dataloader()
-
-        Returns: (embeddings, preds) if return_preds=True or embeddings if return_preds=False
-            types are pd.DataFrame if return_dfs=True, or np.array if return_dfs=False
-            - preds are always original Perch2 class logit scores with no activation layer applied
-            - embeddings are the feature vectors from the penultimate layer of the network
-            If other outputs are desired, eg custom classifier logits, use forward()
-
-        See also:
-            - predict: get per-audio-clip species outputs as pandas DataFrame
-            - forward: get all of Perch's outputs, or any subset
-        """
-        if return_preds:
-            if self.use_custom_classifier:  # self.network outputs
-                return_values = ("embeddings", "custom_classifier_logits")
-            else:  # Perch2 original class logits
-                return_values = ("embeddings", "logits")
-        else:
-            return_values = ("embeddings",)
-
-        # run inference, getting embeddings and optionally logits
-        outs = self.forward(
-            samples=samples,
-            progress_bar=progress_bar,
-            wandb_session=wandb_session,
-            return_values=return_values,
-            return_dfs=return_dfs,
-            **dataloader_kwargs,
-        )
-
-        if return_preds:
-            if self.use_custom_classifier:
-                return outs["embeddings"], outs["custom_classifier_logits"]
-            else:
-                return outs["embeddings"], outs["logits"]
-        else:
-            return outs["embeddings"]
-
-    def embed_to_hoplite_db(
-        self,
-        samples,
-        db,
-        deployment_id=None,
-        progress_bar=True,
-        audio_root=None,
-        embedding_exists_mode="skip",  # skip, error, add
-        commit_frequency_batches=1,
-        overflow_mode="warn",
-        **dataloader_kwargs,
-    ):
-        """Run inference on a dataloader, saving 1D outputs of target_layer to a hoplite database
-
-        Args:
-            samples: (same as CNN.predict())
-            db: a hoplite database object or a path to a hoplite database folder
-                - if a path is provided, the database will be created if it does not exist
-                - when creating a new db, the embedding_dim argument must be provided
-            deployment_id: a hoplite db deployment table ID to associate with all inserted embeddings
-            progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
-            audio_root: the root directory for relative paths to audio files
-            embedding_exists_mode: str, behavior when an embedding already exists for a given
-                (dataset_name, source_id, offset) tuple. Options are:
-                    "skip": skip inserting the embedding (default)
-                    "error": raise an error
-                    "add": add a new embedding entry to the db with the same source info
-                Note that hoplite doesn't currently support removing or replacing existing entries
-            commit_frequency_batches: int, commit to db after every N batches[default: 1]
-            overflow_mode: 'warn', 'error', or 'ignore' behvior when embedding values exceed
-                the range of float16, which is the range of values allowed in hoplite db
-            embedding_dim: int, dimension of the embeddings to be stored
-                - only used when creating a new hoplite db
-                - must match the output dimension of the model's target_layer
-                - if creating new db and embedding_dim is None, guesses based on self.classifier.in_features
-            **dataloader_kwargs: additional keyword arguments to pass to the dataloader
+            target_layer: str or None, select from 'embedding' or 'spatial_embedding'
+                If None, defaults to 'embedding
 
         Returns:
-            (embedding_db, dict with info about failed samples)
+            str, the selected target layer
         """
-        try:
-            import perch_hoplite
-            from perch_hoplite.db import interface as hoplite_interface
-        except ImportError as e:
-            raise ImportError(
-                "hoplite is not installed. Please install hoplite to use this feature."
-            ) from e
-
-        # potentially: store db.metadata.dataset_paths -> dataset_name:audio_root mapping in db
-        # and warn user if overwriting an existing mapping with a different audio_root
-
-        # load or create hoplite db if a path is provided (if hoplite db is passed, use it directly)
-        db = load_or_create_hoplite_usearch_db(db, embedding_dim=self.embedding_size)
-
-        # create dataloader, collate using `identity` to return list of AudioSample
-        # rather than (samples, labels) tensors
-        dataloader = self.predict_dataloader(
-            samples,
-            collate_fn=opso.utils.identity,
-            audio_root=audio_root,
-            **dataloader_kwargs,
-        )
-
-        if embedding_exists_mode in ["skip", "error"]:
-            # filter dataloader to only samples that don't already have embeddings
-            # dataloader.dataset/
-            index_values = list(dataloader.dataset.dataset.label_df.index)
-
-            # check if each exists
-            keep_idxs = []
-            from ml_collections import config_dict
-
-            for i, (file, start_time, end_time) in enumerate(index_values):
-                matching_ids = db.match_window_ids(
-                    # deployments_filter=config_dict.create(
-                    #     eq=dict(project="project"),
-                    # ),
-                    recordings_filter=config_dict.create(
-                        eq=dict(filename=file),
-                    ),
-                    windows_filter=config_dict.create(
-                        eq=dict(offsets=np.array([start_time,end_time], np.float16)),
-                    ),
-                )
-                if len(matching_ids) == 0:
-                    keep_idxs.append(i)
-                elif embedding_exists_mode == "error":
-                    # don't allow adding or skipping duplicated entries
-                    raise ValueError(
-                        f"Embedding already exists for {file}:{start_time}-{end_time}"
-                        " and embedding_exists_mode='error'. Other options are 'skip' or 'add'. "
-                    )
-
-            # subset the label_df to exclude duplicated_idxs
-            dataloader.dataset.dataset.label_df = (
-                dataloader.dataset.dataset.label_df.iloc[keep_idxs]
-            )
-            new_len = len(dataloader.dataset.dataset.label_df)
-
-            if new_len == 0:
-                # all samples already have embeddings, nothing to do
-                print("all samples already have embeddings in the database")
-                return db, {}
-        # elif embedding_exists_mode == "add": # do nothing, allow duplicates
-
-        # add all files to the metadata, retaining the deployment_id in the database
-        recording_ids = {}
-        files = dataloader.dataset.dataset.label_df.index.get_level_values(0).tolist()
-        for file in files:
-            recording_ids[file] = db.insert_recording(
-                filename=file,
-                deployment_id=deployment_id, # TODO
-                # datetime=file_start_timestamp, # TODO
-            )
-
-        # disable gradient updates during inference
-        for i, batch_samples in enumerate(tqdm(dataloader, disable=not progress_bar)):
-
-            batch_tensors, _ = collate_audio_samples(batch_samples)
-            batch_tensors.requires_grad = False
-            model_outputs = self.tf_model.signatures["serving_default"](
-                inputs=batch_tensors.numpy()
-            )
-
-            # move tensorflow tensors to CPU and convert to numpy
-            outs = {
-                k: None if v is None else v.numpy() for k, v in model_outputs.items()
-            }
-
-            batch_emb = outs["embedding"]
-
-            # insert the embeddings one-by-one to the hoplite db
-
-            max_float16 = np.finfo(np.float16).max
-            # we clip values to the float16 range before casting, to avoid overfloat -> inf values
-            if np.abs(batch_emb).max() > max_float16:
-                if overflow_mode == "warn":
-                    warnings.warn("clipping embedding values to float16 range")
-                elif overflow_mode == "error":
-                    raise ValueError("Embeddings exceeded float16 range")
-                # otherwise clip without warnings/errors
-            batch_emb = batch_emb.clip(-max_float16, max_float16).astype(np.float16)
-
-            # insert each embedding in the batch into the database, one-by-one
-            for j in range(batch_tensors.shape[0]):
-                file = batch_samples[j].source
-                if audio_root is not None:
-                    # use the relative path for the source name stored in the db
-                    file = str(Path(file).relative_to(audio_root))
-                start_time = batch_samples[j].start_time
-                duration = batch_samples[j].duration
-                window_id = db.insert_window(
-                    recording_id=recording_ids[file],
-                    offsets=np.array([start_time,start_time+duration], np.float16),
-                    embedding=batch_emb[j],
-                )
-
-            # commit once per commit_frequency_batches batches
-            # committing is relatively slow, but we don't want to lose progress if interrupted
-            if (i + 1) % commit_frequency_batches == 0:
-                db.commit()
-
-        # end of batch loop
-
-        # commit any remaining embeddings!
-        db.commit()
-
-        # return database object and info about any failed samples
-        return (db, {"failed_samples": dataloader.dataset.report()})
-
-    def similarity_search_hoplite_db( #TODO out of date
-        self,
-        query_samples,
-        db,
-        num_results=5,
-        exact_search=False,
-        search_subset_size=None,
-        # datasets=None, # would like to implement filtering to specific datasets
-        target_score=None,
-        audio_root=None,
-        search_kwargs=None,
-        **embedding_kwargs,
-    ):
-        """Perform a similarity search in the Hoplite database.
-
-        Args:
-            query_samples: audio examples for which to find most similar examples
-                file path, list of paths, or dataframe with `file,start_time,end_time` multi-index
-            db: a Hoplite database containing embeddings from the same model
-            num_results: The number of results to return for each query
-            exact_search: default False for usearch (faster), if True uses brute force search
-            search_subset_size: Number of embeddings to compare with. If None, all embeddings
-                are used. For floats between 0 and 1, sample a proportion of the database.
-                For ints, sample the specified number of embeddings.
-                if None [default], searches all embeddings
-                Note: only implemented for exact_search=True
-            target_score: if specified, searches for similarity scores close to target_score
-                default [None] searches for most similar embeddings
-            audio_root: root directory for relative paths to query audio files
-            search_kwargs: dict of additional keyword arguments passed to db.ui.search() or
-                brutalism.threaded_brute_search() if exact_search=True
-                exact_search=False: radius, threads, exact, log, progress
-                exact_search=True: batch_size, max_workers, rng_seed
-            **embedding_kwargs: additional keyword arguments passed to self.embed(), such as
-                batch_size and num_workers
-        Returns:
-            A list of dictionaries with the search results, one item per query sample:
-            Each item is a dictionary with the following keys:
-                - "query": dictionary with query metadata
-                - "results": list of dictionaries with metadata for each retrieved sample
-        """
-        try:
-            from perch_hoplite.db import brutalism
-            from perch_hoplite.db import score_functions
-            from perch_hoplite.db import search_results
-        except ImportError as e:
-            raise ImportError(
-                "hoplite is not installed. Please install hoplite to use this feature."
-            ) from e
-
-        if search_kwargs is None:
-            search_kwargs = {}
-
-        if not exact_search:
-            if search_subset_size is not None:
-                raise NotImplementedError(
-                    "search_subset_size is only implemented for exact_search=True"
-                )
-            if target_score is not None:
-                raise NotImplementedError(
-                    "target_score is only implemented for exact_search=True"
-                )
-
-        # generate embeddings for the query samples
-        print("embedding query samples")
-        embeddings = self.embed(
-            query_samples, audio_root=audio_root, **embedding_kwargs
-        )
-
-        print(
-            f"performing similarity search for each of {embeddings.shape[0]} query samples"
-        )
-        compiled_search_results = []
-        for (qfile, qstart_time, qend_time), emb in embeddings.iterrows():
-            query_embedding = emb.values.astype(np.float16)
-            if exact_search:
-                score_fn = score_functions.get_score_fn(
-                    "dot", target_score=target_score
-                )
-                results, all_scores = brutalism.threaded_brute_search(
-                    db,
-                    query_embedding,
-                    num_results,
-                    score_fn=score_fn,
-                    sample_size=search_subset_size,
-                    **search_kwargs,
-                )
-
-            else:
-                ann_matches = db.ui.search(
-                    query_embedding, count=num_results, **search_kwargs
-                )
-                results = search_results.TopKSearchResults(top_k=num_results)
-                for k, d in zip(ann_matches.keys, ann_matches.distances):
-                    results.update(search_results.SearchResult(k, d))
-
-            # extract relevant info for each match into dictionaries
-            results_list = []
-            for match in results.search_results:
-                clip_info = db.get_embedding_source(match.embedding_id)
-                results_list.append(
-                    {
-                        "embedding_id": match.embedding_id,
-                        "score": match.sort_score,
-                        "dataset_name": clip_info.dataset_name,
-                        "source_id": clip_info.source_id,
-                        "offset": clip_info.offsets[0],
-                    }
-                )
-            compiled_search_results.append(
-                {
-                    "query": {
-                        "file": qfile,
-                        "start_time": qstart_time,
-                        "end_time": qend_time,
-                        # "embedding": query_embedding,
-                        "audio_root": audio_root,
-                    },
-                    "results": results_list,
-                }
-            )
-        return compiled_search_results
+        if target_layer == "spatial_embedding":
+            return "spatial_embedding"
+        else:
+            return "embedding"

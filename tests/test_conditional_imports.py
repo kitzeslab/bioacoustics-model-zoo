@@ -47,6 +47,10 @@ class TestConditionalImports:
         assert "BirdNET" in models
         
         # Try to instantiate - it should either work or raise ImportError
+        # this test currently fails with Mac if ai-edge-litert is > 1.3
+        # and ai-edge-litert is no longer provided for < 2.0 on mac
+        # see https://github.com/google-ai-edge/LiteRT/issues/2836 and 
+        # https://github.com/google-ai-edge/LiteRT/issues/4385
         BirdNETClass = models["BirdNET"]
         try:
             model = BirdNETClass()

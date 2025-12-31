@@ -82,6 +82,8 @@ if ai_edge_litert is None and tf is None:
 
 else:
     from bioacoustics_model_zoo.birdnet import BirdNET, BirdNETOccurrenceModel
+    from bioacoustics_model_zoo import perch_v2_litert
+    from bioacoustics_model_zoo.perch_v2_litert import Perch2LiteRT
 
 # tensorflow requirement
 if tf is None:

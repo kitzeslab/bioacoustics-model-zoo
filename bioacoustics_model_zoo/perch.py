@@ -169,7 +169,7 @@ class Perch(TensorFlowModelWithPytorchClassifier):
             ),
         )
 
-    def _batch_forward(self, batch_data, return_dict=False):
+    def batch_forward(self, batch_data, return_dict=False):
         """run inference on a single batch of samples
 
         Returned logits depend on self.use_custom_classifier: if False, returns
@@ -270,7 +270,7 @@ class Perch(TensorFlowModelWithPytorchClassifier):
         ):
             # _batch_forward returns dict with tf model outputs + custom classifier
             # logits if self.use_custom_classifier=True
-            outs = self._batch_forward(samples_batch, return_dict=True)
+            outs = self.batch_forward(samples_batch, return_dict=True)
 
             # only aggregate the outputs requested to save memory
             if return_value != "embeddings":

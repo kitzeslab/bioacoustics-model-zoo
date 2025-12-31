@@ -10,6 +10,13 @@ import opensoundscape
 from opensoundscape.ml.cnn import CNN
 from opensoundscape.ml.shallow_classifier import MLPClassifier
 
+# TODO:
+# ONNX wrapper class
+# 1. consider moving this to opensoundscape.ml?
+# 2. separate wrappers for tflite vs full tf models?
+# 3. support training/fine-tuning the full tf model?
+# 4. support exporting the full model (tf + pytorch head) to ONNX or similar?
+
 
 class TensorFlowModelWithPytorchClassifier(CNN):
     def __init__(self, embedding_size, classes, sample_duration):
@@ -105,49 +112,13 @@ class TensorFlowModelWithPytorchClassifier(CNN):
         """alias for self.network"""
         return self.network
 
-    def _batch_forward(self, batch_data):
-        """This method should return the tensorflow model output  logits if
-        self.use_custom_classifier is False, otherwise it should use the custom
-        classifier (self.network) to generate logits on the embeddings from the
-        tensorflow model.
+    def batch_forward(self, batch_data, targets, avgpool=False):
+        """This method should return a dictionary of outputs for each key specified in targets
 
-        It must return (embeddings, logits) on a single batch of samples
+        the key -1 should return the final model outputs (eg clas logits)
         """
         raise NotImplementedError("This method should be implemented in subclasses")
 
-    def __call__(self, dataloader):
-        """This method should call _batch_forward() for each batch in the dataloader
-
-        Return values might depend on the model or be configurable through arguments
-        """
-        raise NotImplementedError("This method should be implemented in subclasses")
-
-    def embed(self, samples):
-        """This method should call __call__() on the output of self.predict_dataloader(samples)
-
-        Return values might depend on the model or be configurable through arguments
-        """
-        raise NotImplementedError("This method should be implemented in subclasses")
-
-    # def training_step(self, samples, batch_idx):
-    #     """a standard Lightning method used within the training loop, acting on each batch
-
-    #     returns loss
-
-    #     Effects:
-    #         logs metrics and loss to the current logger
-    #     """
-    #     batch_data, batch_labels = samples
-    #     # first run the preprocessed samples through the tensorflow feature extractor
-    #     # discard the logits produced by the tensorflow classifier, just keep embeddings
-    #     self.use_custom_classifier = False
-    #     embeddings, _ = self._batch_forward(batch_data)
-    #     # switch from Tensorflow classifier head to custom classifier (self.network)
-    #     self.use_custom_classifier = True
-    #     # then run the embeddings through the trainable classifier with a typical "train" step
-    #     return super().training_step(
-    #         (torch.tensor(embeddings), torch.tensor(batch_labels)), batch_idx
-    #     )
     def train(
         self,
         train_df,

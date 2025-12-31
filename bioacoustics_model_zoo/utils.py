@@ -165,7 +165,7 @@ def collate_to_np_array(audio_samples):
 
 class AudioSampleArrayDataloader(SafeAudioDataloader):
     def __init__(self, *args, **kwargs):
-        """Load samples with specific collate function
+        """Load audio samples, collating to np.array of audio signals unless collate_fn is specified.
 
         Collate function takes list of AudioSample objects with type(.data)=opensoundscape.Audio
         and returns np.array of shape [batch, length of audio signal]
@@ -173,5 +173,6 @@ class AudioSampleArrayDataloader(SafeAudioDataloader):
         Args:
             see SafeAudioDataloader
         """
-        kwargs.update({"collate_fn": collate_to_np_array})
+        if not "collate_fn" in kwargs or kwargs["collate_fn"] is None:
+            kwargs.update({"collate_fn": collate_to_np_array})
         super(AudioSampleArrayDataloader, self).__init__(*args, **kwargs)

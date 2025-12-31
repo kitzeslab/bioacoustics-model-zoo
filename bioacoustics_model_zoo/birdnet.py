@@ -127,7 +127,13 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         # clf is assigned to .network and is the only part that is trained with .train(),
         # the birdnet feature extractor (self.tf_model) is frozen
         # note that this clf will have random weights
-        super().__init__(embedding_size=1024, classes=classes, sample_duration=3)
+        self.embedding_size = 1024
+        sample_duration = 3  # fixed input size 3 seconds for birdnet
+        super().__init__(
+            embedding_size=self.embedding_size,
+            classes=classes,
+            sample_duration=sample_duration,
+        )
 
         # download model if URL, otherwise find it at local path:
         if checkpoint_url.startswith("http"):
@@ -154,24 +160,30 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
 
         # initialize preprocessor and choose dataloader class
         self.preprocessor = AudioAugmentationPreprocessor(
-            sample_duration=3, sample_rate=48000
+            sample_duration=sample_duration, sample_rate=48000
         )
         # extend short samples to 3s by padding end with zeros (silence)
         self.preprocessor.insert_action(
             action_index="extend",
-            action=Action(Audio.extend_to, is_augmentation=False, duration=3),
+            action=Action(
+                Audio.extend_to, is_augmentation=False, duration=sample_duration
+            ),
         )
         self.inference_dataloader_cls = AudioSampleArrayDataloader
         self.train_dataloader_cls = AudioSampleArrayDataloader
 
-    def _batch_forward(self, batch_data):
+    def batch_forward(self, batch_data, targets=(-1,), avgpool=True):
         """run forward pass on a batch of data
 
         Args:
             batch_data: np.array of shape [batch, ...]
+            targets: tuple of str, which outputs to return:
+                - use -1 to get logits from BirdNET final layer
+                - use "custom_classifier_logits" to get logits from custom classifier head (self.network)
+            avgpool: not implemented (BirdNET embeddings are already pooled)
 
-        Returns: (embeddings, logits)
-            Note: the classification head used depends on `self.use_custom_classifier`:
+        Returns: dictionary of outputs for each key in targets
+            Note: the classification logits (-1 key) depend on `self.use_custom_classifier`:
             - if False, the final layer of the BirdNET model is used
             - if True, the custom classifier (self.network) is used
         """
@@ -191,136 +203,24 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         self.tf_model.set_tensor(input_details["index"], np.float32(batch_data))
         self.tf_model.invoke()  # forward pass
 
+        outs = {}
         batch_embeddings = self.tf_model.get_tensor(embedding_idx)
-        if self.use_custom_classifier:
-            # run self.network on the features from birdnet to predict using self.network
-            tensors = torch.tensor(batch_embeddings).to(self.device)
-            self.network.to(self.device)
-            batch_logits = self.network(tensors).detach().cpu().numpy()
-        else:
-            batch_logits = self.tf_model.get_tensor(output_details["index"])
+        if "embedding" in targets:
+            if "embedding" in targets:
+                outs["embedding"] = batch_embeddings
+        if -1 in targets:  # add class logit score predictions
+            if self.use_custom_classifier:
+                # run self.network on the features from birdnet to predict using self.network
+                tensors = torch.tensor(batch_embeddings).to(self.device)
+                self.network.to(self.device)
+                outs[-1] = self.network(tensors).detach().cpu().numpy()
+            else:
+                outs[-1] = self.tf_model.get_tensor(output_details["index"])
 
-        return batch_embeddings, batch_logits
+        return outs
 
-    def __call__(
-        self,
-        dataloader,
-        return_embeddings=False,
-        return_logits=True,
-        wandb_session=None,
-        progress_bar=True,
-    ):
-        """forward pass
-
-        Args:
-            dataloader: dataloader object created with self.predict_dataloader(samples)
-            return_embeddings, return_logits: bool, which outputs to return
-                (cannot both be False; if both true, returns (logits, embeddings))
-                [default: return_logits=True, return_embeddings=False]
-            wandb_session: wandb.Session object, if provided, logs progress to wandb
-            progress_bar: bool, if True, shows a progress bar with tqdm
-
-        Returns: depends on return_embeddings and return_logits
-            - if both True, returns (logits, embeddings)
-            - if only return_logits, returns logits
-            - if only return_embeddings, returns embeddings
-
-            The classification head used depends on `self.use_custom_classifier`:
-            - if False, the final layer of the BirdNET model is used
-            - if True, the custom classifier (self.network) is used
-        """
-        if not return_logits and not return_embeddings:
-            raise ValueError("Both return_logits and return_embeddings cannot be False")
-
-        # iterate batches, running inference on each
-        logits = []
-        embeddings = []
-        for batch_data, _ in tqdm(dataloader, disable=not progress_bar):
-            batch_embeddings, batch_logits = self._batch_forward(batch_data)
-            if return_logits:
-                logits.extend(batch_logits)
-            if return_embeddings:
-                embeddings.extend(batch_embeddings)
-
-            if wandb_session is not None:
-                wandb_session.log(
-                    {
-                        "progress": len(logits) / len(dataloader.dataset),
-                        "completed_batches": len(logits),
-                        "total_batches": len(dataloader.dataset),
-                    }
-                )
-        logits = np.array(logits)
-        embeddings = np.array(embeddings)
-
-        if return_logits and return_embeddings:
-            return logits, embeddings
-        elif return_logits:
-            return logits
-        elif return_embeddings:
-            return embeddings
-
-    def embed(
-        self,
-        samples,
-        progress_bar=True,
-        return_preds=False,
-        return_dfs=True,
-        **kwargs,
-    ):
-        """
-        Generate embeddings for audio files/clips
-
-        wraps self.__call__ by generating a dataloader and handling output preferences
-
-        Args:
-            samples: same as CNN.predict(): list of file paths, OR pd.DataFrame with index
-                containing audio file paths, OR a pd.DataFrame with multi-index (file, start_time,
-                end_time)
-            progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
-            return_preds: bool, if True, returns two outputs (embeddings, logits)
-            return_dfs: bool, if True, returns embeddings as pd.DataFrame with multi-index like
-                .predict(). if False, returns np.array of embeddings [default: True].
-            kwargs are passed to self.predict_dataloader()
-
-        Returns: (embeddings, preds) if return_preds=True or embeddings if return_preds=False
-            types are pd.DataFrame if return_dfs=True, or np.array if return_dfs=False
-            - preds are always logit scores with no activation layer applied
-            - embeddings are the feature vectors from the penultimate layer of the network
-        """
-        # create dataloader to generate batches of AudioSamples
-        dataloader = self.predict_dataloader(samples, **kwargs)
-
-        # run inference, returns (scores, embeddings)
-        # or just (embeddings) if return_preds=False
-        returns = self(
-            dataloader=dataloader,
-            progress_bar=progress_bar,
-            return_embeddings=True,
-            return_logits=return_preds,
-        )
-        # we got one output (embeddings) if return_preds is False or two outputs (logits, embeddings)
-        # if return_preds is True
-        if return_preds:
-            preds, embeddings = returns
-        else:
-            embeddings = returns
-
-        if return_dfs:
-            # put embeddings in DataFrame with multi-index like .predict()
-            embeddings = pd.DataFrame(
-                data=embeddings, index=dataloader.dataset.dataset.label_df.index
-            )
-
-        if return_preds:
-            if return_dfs:
-                # put predictions in a DataFrame with same index as embeddings
-                preds = pd.DataFrame(
-                    data=preds, index=dataloader.dataset.dataset.label_df.index
-                )
-            return embeddings, preds
-        else:
-            return embeddings
+    def _check_or_get_default_embedding_layer(self, target_layer=None):
+        return "embedding"
 
 
 @register_bmz_model
