@@ -6,6 +6,7 @@ from bioacoustics_model_zoo.tensorflow_wrapper import (
 import pandas as pd
 import torch
 import warnings
+import numpy as np
 
 import opensoundscape
 from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
@@ -174,7 +175,8 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         # match the resampling method used by Perch / HopLite repo
         self.preprocessor.pipeline["load_audio"].params["resample_type"] = "polyphase"
 
-        # avoid invalid sample values outside of [-1,1]
+        # during inference, Perch rescales with per-sample peak normalization to 0.25
+        # https://github.com/kitzeslab/bioacoustics-model-zoo/issues/30#issuecomment-3134186126
         self.preprocessor.insert_action(
             action_index="normalize_signal",
             action=Action(
@@ -184,7 +186,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
     def batch_forward(
         self,
-        batch_data,
+        batch_samples,
         targets=("embedding", "spatial_embedding", "label", "spectrogram"),
         avgpool=False,
     ):
@@ -201,8 +203,8 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         Returns:
             dict with keys matching targets, values are np.arrays of outputs
         """
-
-        model_outputs = self.tf_model.signatures["serving_default"](inputs=batch_data)
+        data = np.array([s.data.samples for s in batch_samples], dtype=np.float32)
+        model_outputs = self.tf_model.signatures["serving_default"](inputs=data)
 
         # opensoundscape uses reserved key -1 for model outputs e.g. during .predict()
         if -1 in targets:

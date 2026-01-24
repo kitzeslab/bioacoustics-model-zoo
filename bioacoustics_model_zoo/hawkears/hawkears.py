@@ -330,11 +330,13 @@ class HawkEars(CNN):
 
         # initialize the CNN object with this architecture and class list
         # use 3s duration and expected sample shape for HawkEars
-        super(HawkEars, self).__init__(
+        super().__init__(
             arch,
             classes=classes,
             sample_duration=cfg.audio.segment_len,
-            sample_shape=[cfg.audio.spec_height, cfg.audio.spec_width, 1],
+            height=cfg.audio.spec_height,
+            width=cfg.audio.spec_width,
+            channels=1,
         )
         self.class_codes = class_codes
         """4-letter alpha codes (or similar for non-birds) corresponding to self.classes"""

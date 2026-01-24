@@ -44,6 +44,7 @@ transformers = {version = ">=4.20.0", optional = true}
 [tool.poetry.extras]
 tensorflow = ["tensorflow", "tensorflow-hub"]
 perch = ["tensorflow", "tensorflow-hub"]
+perch2 = ["tensorflow", "tensorflow-hub"]
 birdnet = ["ai-edge-litert"]
 hawkears = ["torch", "torchvision", "torchaudio", "timm"]
 birdset = ["torch", "torchvision", "torchaudio", "transformers"]

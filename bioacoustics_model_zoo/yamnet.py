@@ -9,10 +9,10 @@ import opensoundscape
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
-from opensoundscape.ml.cnn import BaseModule
 from opensoundscape import Audio, Action
 
 from bioacoustics_model_zoo.utils import register_bmz_model
+from bioacoustics_model_zoo.tensorflow_wrapper import TensorFlowModelWithPytorchClassifier
 
 
 def class_names_from_csv(class_map_csv_text):
@@ -38,7 +38,7 @@ class YAMNetDataloader(SafeAudioDataloader):
 
 
 @register_bmz_model
-class YAMNet(BaseModule):
+class YAMNet(TensorFlowModelWithPytorchClassifier):
     def __init__(self, url="https://tfhub.dev/google/yamnet/1", input_duration=60):
         """load YAMNet Audio CNN from tensorflow hub
 
@@ -70,7 +70,6 @@ class YAMNet(BaseModule):
         persist across system restart), but this can be configured
         (see https://www.tensorflow.org/hub/caching#caching_of_compressed_downloads)
         """
-
         # only require tensorflow and tensorflow_hub if/when this class is used
         try:
             import tensorflow as tf
@@ -80,10 +79,22 @@ class YAMNet(BaseModule):
                 "YAMNet requires tensorflow and tensorflow_hub packages to be installed. "
                 "Install in your python environment with `pip install tensorflow tensorflow_hub`"
             ) from exc
+        
+        # load class list (based on example from https://tfhub.dev/google/yamnet/1)
+        class_map_path = self.tf_model.class_map_path().numpy()
+        class_names = class_names_from_csv(
+            tf.io.read_file(class_map_path).numpy().decode("utf-8")
+        )
+
+        super().__init__(
+            embedding_size=1024,
+            classes=class_names,
+            sample_duration=input_duration,
+        )
 
         # Load the model.
-        self.network = tensorflow_hub.load(url)
-        self.input_duration = input_duration
+        self.tf_model = tensorflow_hub.load(url)
+        self.sample_duration = self.input_duration = input_duration
         self.preprocessor = AudioPreprocessor(
             sample_duration=input_duration, sample_rate=16000
         )
@@ -95,22 +106,16 @@ class YAMNet(BaseModule):
             ),
         )
         # the dataloader returns a list of AudioSample objects, with .data as audio waveform samples
-        self.inference_dataloader_cls = YAMNetDataloader  # SafeAudioDataloader
-
-        # load class list (based on example from https://tfhub.dev/google/yamnet/1)
-        class_map_path = self.network.class_map_path().numpy()
-        class_names = class_names_from_csv(
-            tf.io.read_file(class_map_path).numpy().decode("utf-8")
-        )
-        self.classes = class_names
+        self.inference_dataloader_cls = YAMNetDataloader
+        self.train_dataloader_cls = YAMNetDataloader
 
         self.device = opensoundscape.ml.cnn._gpu_if_available()
 
     def __display__(self):
-        return "YAMNnet model loaded from tfhub"
+        return "YAMNet model loaded from tfhub to Bioacoustics Model Zoo"
 
     def __repr__(self):
-        return "YAMNnet model loaded from tfhub"
+        return "YAMNet model loaded from tfhub to Bioacoustics Model Zoo"
 
     def __call__(
         self,

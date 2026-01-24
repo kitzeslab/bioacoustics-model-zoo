@@ -161,7 +161,8 @@ class Perch(TensorFlowModelWithPytorchClassifier):
             ),
         )
 
-        # perch v2 preprocessing normalizes audio to peak = 0.25
+        # perch preprocessing normalizes audio to peak = 0.25
+        # https://github.com/kitzeslab/bioacoustics-model-zoo/issues/30#issuecomment-3134186126
         self.preprocessor.insert_action(
             action_index="normalize_signal",
             action=Action(
