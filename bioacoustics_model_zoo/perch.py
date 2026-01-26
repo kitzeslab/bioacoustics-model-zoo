@@ -178,8 +178,8 @@ class Perch(TensorFlowModelWithPytorchClassifier):
         custom classifier (self.network)
 
         Args:
-            batch_data: np.array of shape (n_samples, n_samples) return_dict:
-            bool, if True, returns a dictionary of all outputs
+            batch_samples: list of AudioSample objects
+            return_dict: bool, if True, returns a dictionary of all outputs
                 [default: False] return (embeddings, logits)
 
         Returns:
@@ -193,6 +193,7 @@ class Perch(TensorFlowModelWithPytorchClassifier):
                 if return_dict=True, dict has additional key 'custom_classifier'
                 with outputs of self.network
         """
+        batch_data = np.array([s.data.samples for s in batch_data], dtype=np.float32)
         outs = self.tf_model.infer_tf(batch_data)
         if self.version < 8:
             # earlier versions just output (logits, embeddings)

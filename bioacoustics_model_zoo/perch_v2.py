@@ -208,7 +208,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
         # opensoundscape uses reserved key -1 for model outputs e.g. during .predict()
         if -1 in targets:
-            model_outputs[-1] = model_outputs["logits"]
+            model_outputs[-1] = model_outputs["label"]
         # move tensorflow tensors to CPU and convert to numpy
         # only retaining requested outputs
         outs = {
@@ -231,7 +231,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         samples,
         progress_bar=True,
         wandb_session=None,
-        return_values=("logits", "embeddings", "spatial_embeddings", "spectrograms"),
+        targets=("logits", "embeddings", "spatial_embeddings", "spectrograms"),
         return_dfs=True,
         **dataloader_kwargs,
     ):
@@ -248,7 +248,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             samples: list of file paths, OR pd.DataFrame with index containing audio file paths
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
             wandb_session: wandb.Session object, if provided, logs progress
-            return_values: tuple(str,): select from 'logits', 'embeddings',
+            targets: tuple(str,): select from 'logits', 'embeddings',
                 'spatial_embeddings', 'spectrograms', 'custom_classifier_logits'
                 [default: ('logits','embeddings','spatial_embeddings','spectrograms')]
                 Include any combination of the following:
@@ -282,7 +282,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             dataloader=dataloader,
             wandb_session=wandb_session,
             progress_bar=progress_bar,
-            return_values=return_values,
+            targets=targets,
         )
 
         # optionally put 1D outputs in DataFrames with multi-index ('file','start_time','end_time')
