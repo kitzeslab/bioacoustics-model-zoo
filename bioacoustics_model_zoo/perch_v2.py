@@ -209,22 +209,24 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         # opensoundscape uses reserved key -1 for model outputs e.g. during .predict()
         if -1 in targets:
             model_outputs[-1] = model_outputs["label"]
-        # move tensorflow tensors to CPU and convert to numpy
+
+        if "custom_classifier_logits" in targets:
+            emb_tensor = torch.tensor(model_outputs["embedding"].numpy()).to(
+                self.device
+            )
+            self.network.to(self.device)
+            model_outputs["custom_classifier_logits"] = (
+                self.network(emb_tensor).detach().cpu()
+            )
+
         # only retaining requested outputs
-        outs = {
+        model_outputs = {
             k: None if v is None else v.numpy()
             for k, v in model_outputs.items()
             if k in targets
         }
 
-        if "custom_classifier_logits" in targets:
-            emb_tensor = torch.tensor(outs["embedding"]).to(self.device)
-            self.network.to(self.device)
-            outs["custom_classifier_logits"] = (
-                self.network(emb_tensor).detach().cpu().numpy()
-            )
-
-        return outs
+        return model_outputs
 
     def forward(
         self,
