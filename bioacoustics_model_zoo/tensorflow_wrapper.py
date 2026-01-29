@@ -59,13 +59,13 @@ class TensorFlowModelWithPytorchClassifier(CNN):
     def classifier(self):
         return self.network
 
-    def change_classes(self, new_classes, hidden_layer_sizes=()):
+    def change_classes(self, classes, hidden_layer_sizes=()):
         """alias for initialize_custom_classifier"""
         self.initialize_custom_classifier(
-            new_classes=new_classes, hidden_layer_sizes=hidden_layer_sizes
+            classes=classes, hidden_layer_sizes=hidden_layer_sizes
         )
 
-    def initialize_custom_classifier(self, new_classes, hidden_layer_sizes=()):
+    def initialize_custom_classifier(self, classes, hidden_layer_sizes=()):
         """initialize a custom classifier to replace the BirdNET classifier head
 
         The classifier is a multi-layer perceptron with ReLU activations and a final
@@ -91,10 +91,10 @@ class TensorFlowModelWithPytorchClassifier(CNN):
             runs self.change_classes(classes) if classes is not None, resulting in
                 self.classes = classes
         """
-        self._custom_classes = new_classes
+        self._custom_classes = classes
         self.network = MLPClassifier(
             input_size=self.embedding_size,
-            output_size=len(new_classes),
+            output_size=len(classes),
             hidden_layer_sizes=hidden_layer_sizes,
         )
         self.use_custom_classifier = True
