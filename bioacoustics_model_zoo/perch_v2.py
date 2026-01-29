@@ -4,21 +4,17 @@ from bioacoustics_model_zoo.tensorflow_wrapper import (
 )
 
 from pathlib import Path
-
 import pandas as pd
 import numpy as np
-import urllib
 import torch
 import warnings
 
 import opensoundscape
 from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
-from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from tqdm.autonotebook import tqdm
 from opensoundscape import Action, Audio, CNN
 
 from bioacoustics_model_zoo.utils import (
-    collate_to_np_array,
     AudioSampleArrayDataloader,
     register_bmz_model,
 )
@@ -34,15 +30,16 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     [Perch v2](https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2)
     is shared under the [Apache 2.0 License](https://opensource.org/license/apache-2-0/).
 
-    Note: different model checkpoints are downloaded depending on whether `torch.cuda.is_available()`
-    is True or False. If true, the default, GPU-only model is downloaded. If false, a CPU-compatible
-    model is downloaded. The type of model loaded is indicated by `self.system` attribute.
+    Note: different model checkpoints are downloaded depending on whether device is 'cpu' or 'gpu'.
+    If Device is None, it is set to 'gpu' if torch.cuda.is_available() evaluates to True.
+    If device is 'gpu', a GPU-only model is downloaded. If 'cpu', a CPU-only
+    model is downloaded. The type of model loaded is indicated by `self.device` attribute.
 
     The model can be used to classify sounds from about 15,000 species (10,000 are birds), or
     to generate feature embeddings for audio files. It was trained on recordings from Xeno Canto
     and iNaturalist Sounds.
 
-    The model is not "fine-tunable" - that is, you can train classification heads on the embeddings
+    The feature extractor is not trainable: you can train classification heads on the embeddings
     but cannot train the feature extractor weights.
 
     Model performance is described in :
@@ -86,7 +83,20 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     ```
     """
 
-    def __init__(self, version=None):
+    def __init__(self, version=None, device=None):
+        """initialize Perch2 BMZ model from TensorFlow Hub
+
+        Args:
+            version: select from released versions of Perch v2.0 on Kaggle
+                Default: None currently selects "2" for GPU-compatible model or
+                "1" for CPU-compatible model (latest as of October 2025).
+            device: selects GPU vs CPU for the tensorflow model
+                Note that different models are downloaded from TF Hub for GPU vs CPU usage.
+                - default [None]: uses GPU if available, otherwise CPU
+                - 'cpu': forces CPU usage
+                - 'gpu': forces GPU usage
+
+        """
         # only require tensorflow and tensorflow_hub if/when this class is used
         try:
             import tensorflow_hub as hub
@@ -99,29 +109,26 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             ) from exc
 
         # which model to load depends on whether GPU is available
-        if torch.cuda.is_available():
-            system = "GPU"
+        if device is None:
+            device = "gpu" if torch.cuda.is_available() else "cpu"
+        if device == "gpu":
             if version is None:
                 version = 2  # latest GPU-compatible as of Oct 2025
-            tested_versions = (2,)
+            tested_versions = (2,)  # as of Jan 2026
 
             tfhub_path = f"https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2/{version}"
         else:
-            system = "CPU"
             if version is None:
                 version = 1  # latest CPU-compatible as of Oct 2025
-            tested_versions = (1,)
+            tested_versions = (1,)  # as of Jan 2026
             tfhub_path = f"https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2_cpu/{version}"
 
+        self.device = device
+        self.version = version
         if not version in tested_versions:
             warnings.warn(
-                f"version {version} has not been tested on {system}, tested versions: {tested_versions}"
+                f"version {version} has not been tested on {device}, tested versions: {tested_versions}"
             )
-        self.version = version
-        self.system = system
-
-        from pathlib import Path
-        import pandas as pd
 
         # first try hub.load(url): succeeds to download but fails to find file within subfolder
         try:
