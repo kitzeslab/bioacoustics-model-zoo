@@ -254,7 +254,7 @@ embeddings = model.embed(['test.wav']) # generate embeddings on each 5 sec of au
 Training: see `BirdNET` example above, training is equivalent (only trains
 shallow classifier on frozen feature extractor).
 
-### [HawkEars](https://github.com/jhuus/HawkEars)
+### [HawkEars](https://github.com/jhuus/HawkEars1)
 
 Bird classification model for 314 North American species
 

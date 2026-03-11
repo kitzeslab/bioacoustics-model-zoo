@@ -39,7 +39,7 @@ class HawkEarsSpec(BaseAction):
             - default 'cpu' is safest best but slowest
 
     based on:
-    https://github.com/jhuus/HawkEars/blob/24bc5a3e031866bc3ff81343bffff83429ee7897/core/audio.py
+    https://github.com/jhuus/HawkEars1/blob/24bc5a3e031866bc3ff81343bffff83429ee7897/core/audio.py
     """
 
     def __init__(self, cfg=None, low_band=False, device="cpu"):
@@ -128,11 +128,15 @@ class HawkEarsSpec(BaseAction):
         # normalize
         spec = self._normalize(spec)
 
-        # reshape if needed (https://github.com/jhuus/HawkEars/blob/f924114ebe6e6f220df74f9fb136f6194f7ac0e8/core/audio.py#L150C17-L153C17)
-        spec = spec[:self.cfg.audio.spec_height, :self.cfg.audio.spec_width]
+        # reshape if needed (https://github.com/jhuus/HawkEars1/blob/f924114ebe6e6f220df74f9fb136f6194f7ac0e8/core/audio.py#L150C17-L153C17)
+        spec = spec[: self.cfg.audio.spec_height, : self.cfg.audio.spec_width]
         if spec.shape[1] < self.cfg.audio.spec_width:
-            spec = np.pad(spec, ((0, 0), (0, self.cfg.audio.spec_width - spec.shape[1])), 'constant', constant_values=0)
-        
+            spec = np.pad(
+                spec,
+                ((0, 0), (0, self.cfg.audio.spec_width - spec.shape[1])),
+                "constant",
+                constant_values=0,
+            )
 
         # update the AudioSample's .data in-place
         sample.data = torch.tensor(spec).unsqueeze(0)
@@ -168,7 +172,7 @@ class HawkEars(CNN):
     """HawkEars Canadian bird classification CNN v0.1.0
 
     Hawkears[1] was developed by Jan Huus and is actively maintained on the
-    [GitHub repository](https://github.com/jhuus/HawkEars)
+    [GitHub repository](https://github.com/jhuus/HawkEars1)
 
     [1] Huus, Jan, et al. 2024 "Hawkears: A Regional, High-Performance Avian
     Acoustic Classifier." SSRN.
@@ -529,7 +533,7 @@ class HawkEars_v010(HawkEars):
     """HawkEars Canadian bird classification CNN v0.1.0
 
     Hawkears[1] was developed by Jan Huus and is actively maintained on the
-    [GitHub repository](https://github.com/jhuus/HawkEars)
+    [GitHub repository](https://github.com/jhuus/HawkEars1)
 
     [1] Huus, Jan, et al. 2024 "Hawkears: A Regional, High-Performance Avian
     Acoustic Classifier." SSRN.
@@ -583,7 +587,7 @@ class HawkEars_v010(HawkEars):
 
         if ckpt_stem is None:
             ckpt_stem = (
-                "https://github.com/jhuus/HawkEars/raw/refs/tags/0.1.0/data/ckpt"
+                "https://github.com/jhuus/HawkEars1/raw/refs/tags/0.1.0/data/ckpt"
             )
         elif not str(ckpt_stem).startswith("http"):
             ckpt_stem = Path(ckpt_stem).resolve()  # local path: convert to full path

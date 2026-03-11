@@ -16,7 +16,7 @@ def list_hawkears_checkpoints(tag, lowband=False, embedding=False):
     # Replace with your GitHub token if needed (for higher rate limits)
     g = Github()
 
-    repo = g.get_repo("jhuus/HawkEars")
+    repo = g.get_repo("jhuus/HawkEars1")
     ref = f"tags/{tag}"
 
     # Get the SHA for the tag
@@ -28,7 +28,7 @@ def list_hawkears_checkpoints(tag, lowband=False, embedding=False):
 
     # Filter for .ckpt files in data/ckpt/
     ckpt_files = [
-        f"https://github.com/jhuus/HawkEars/raw/refs/tags/{tag}/" + f.path
+        f"https://github.com/jhuus/HawkEars1/raw/refs/tags/{tag}/" + f.path
         for f in tree.tree
         if f.path.startswith(search_path) and f.path.endswith(pattern)
     ]

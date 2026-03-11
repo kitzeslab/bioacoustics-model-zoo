@@ -1,5 +1,5 @@
 # Base configuration. Specific configurations only have to specify the parameters they're changing.
-# this file is copied directly from https://github.com/jhuus/HawkEars/blob/0.1.0/core/base_config.py
+# this file is copied directly from https://github.com/jhuus/HawkEars1/blob/0.1.0/core/base_config.py
 # and corresponds to tag 0.1.0
 from dataclasses import dataclass
 
