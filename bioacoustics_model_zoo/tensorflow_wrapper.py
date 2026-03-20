@@ -59,6 +59,15 @@ class TensorFlowModelWithPytorchClassifier(CNN):
     def classifier(self):
         return self.network
 
+    # setter
+    @classifier.setter
+    def classifier(self, new_classifier):
+        self.network = new_classifier
+        if hasattr(new_classifier, "classes"):
+            self._custom_classes = new_classifier.classes
+        self.use_custom_classifier = True
+        self._init_torch_metrics()
+
     def change_classes(self, classes, hidden_layer_sizes=()):
         """alias for initialize_custom_classifier"""
         self.initialize_custom_classifier(
@@ -96,6 +105,7 @@ class TensorFlowModelWithPytorchClassifier(CNN):
             input_size=self.embedding_size,
             output_size=len(classes),
             hidden_layer_sizes=hidden_layer_sizes,
+            classes=classes,
         )
         self.use_custom_classifier = True
         self._init_torch_metrics()
@@ -263,7 +273,7 @@ class TensorFlowModelWithPytorchClassifier(CNN):
         """
         import warnings
 
-        model_dict = torch.load(path)
+        model_dict = torch.load(path, weights_only=False)
 
         opso_version = (
             model_dict.pop("opensoundscape_version")
@@ -301,3 +311,21 @@ class TensorFlowModelWithPytorchClassifier(CNN):
 
         model.use_custom_classifier = True
         return model
+
+    def save_classifier(self, path):
+        """save self.network (the custom classifier head) to path
+
+        can be reloaded with self.load_classifier(path)"""
+        assert isinstance(
+            self.network, MLPClassifier
+        ), "model.save_classifier() only supports saving .network if it is an instance of the MLPClassifier class"
+        self.network.save(path)
+
+    def load_classifier(self, path):
+        """load a custom classifier head from path and assign it to self.network
+
+        can be used to load a classifier head saved with self.save_classifier(path)"""
+        clf = MLPClassifier.load(path)
+        # .classifier assignment here uses the @property.setter for self.classifier property,
+        # which sets self.network and updates self._custom_classes and self.use_custom_classifier
+        self.classifier = clf
