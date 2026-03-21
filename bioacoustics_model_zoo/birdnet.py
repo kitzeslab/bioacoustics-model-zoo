@@ -172,11 +172,11 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         self.inference_dataloader_cls = AudioSampleArrayDataloader
         self.train_dataloader_cls = AudioSampleArrayDataloader
 
-    def batch_forward(self, batch_data, targets=(-1,), avgpool=True):
+    def batch_forward(self, batch_samples, targets=(-1,), avgpool=True):
         """run forward pass on a batch of data
 
         Args:
-            batch_data: np.array of shape [batch, ...]
+            batch_samples: list of AudioSample objects
             targets: tuple of str, which outputs to return:
                 - use -1 to get logits from BirdNET final layer
                 - use "custom_classifier_logits" to get logits from custom classifier head (self.network)
@@ -194,16 +194,20 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         # choose which layer should be used for embeddings
         embedding_idx = output_details["index"] - 1
 
+        # collate AudioSamples to np array of shape [batch, length of audio signal]
+        batch_data = np.array([s.data.samples for s in batch_samples], dtype=np.float32)
+
         # we need to reshape the format of expected input tensor for TF model to include batch dimension
         self.tf_model.resize_tensor_input(
             input_layer_idx, [len(batch_data), *batch_data[0].shape]
         )
-        self.tf_model.allocate_tensors()  # memory allocation?
+        self.tf_model.allocate_tensors()  # memory allocation
         # send data to model
         self.tf_model.set_tensor(input_details["index"], np.float32(batch_data))
         self.tf_model.invoke()  # forward pass
 
         outs = {}
+
         batch_embeddings = self.tf_model.get_tensor(embedding_idx)
         if "embedding" in targets:
             if "embedding" in targets:
