@@ -1,4 +1,5 @@
 from opensoundscape import CNN as _CNN
+import opensoundscape
 from opensoundscape.ml.cnn_architectures import resnet18
 import torch
 from bioacoustics_model_zoo.utils import register_bmz_model
@@ -23,6 +24,10 @@ class RanaSierraeCNN(_CNN):
 
         Note: uses torch.hub, which caches files in ~/.cache/torch/hub/ by default
         rather than in the bioacoustics model zoo's cache location.
+
+        Note 2: This model was traing with OpenSoundscape <0.13.0, which computed spectrograms
+        differently than later versions. The model will produce different outputs if used with
+        OpenSoundscape >=0.13.0, and performance may suffer dramatically.
         """
         # initialize resnet with random weights, since we will load pre-trained weights
         arch = resnet18(num_classes=2, weights=None)
@@ -39,7 +44,15 @@ class RanaSierraeCNN(_CNN):
         self.preprocessor.pipeline.bandpass.set(min_f=300, max_f=2000)
 
         # use legacy interpolation mode
-        self.preprocessor.pipeline.to_tensor.set(use_skimage=True)
+        if opensoundscape.__version__ >= "0.13.0":
+            warnings.warn(
+                """This model was trained with OpenSoundscape <0.13.0, which
+                computed spectrograms differently than later versions. The model
+                will produce different outputs if used with OpenSoundscape
+                >=0.13.0, and performance may suffer dramatically."""
+            )
+        else:
+            self.preprocessor.pipeline.to_tensor.set(use_skimage=True)
 
         # modify augmentation routine parameters
         self.preprocessor.pipeline.frequency_mask.set(max_masks=5, max_width=0.1)

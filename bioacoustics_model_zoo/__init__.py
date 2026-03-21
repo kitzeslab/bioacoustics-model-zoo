@@ -1,4 +1,4 @@
-__version__ = "0.12.2"
+__version__ = "0.12.3"
 
 import torch
 from bioacoustics_model_zoo import utils
