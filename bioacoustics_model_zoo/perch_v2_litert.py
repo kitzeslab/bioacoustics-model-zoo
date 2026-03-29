@@ -1,20 +1,16 @@
-from bioacoustics_model_zoo.utils import register_bmz_model
+from pathlib import Path
+
+import numpy as np
+import opensoundscape
+import pandas as pd
+import torch
+from opensoundscape import Action, Audio
+from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
+
 from bioacoustics_model_zoo.tensorflow_wrapper import (
     TensorFlowModelWithPytorchClassifier,
 )
-
-import pandas as pd
-import torch
-import warnings
-
-import opensoundscape
-from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
-from opensoundscape import Action, Audio
-from bioacoustics_model_zoo.utils import (
-    AudioSampleArrayDataloader,
-    register_bmz_model,
-)
-from pathlib import Path
+from bioacoustics_model_zoo.utils import AudioSampleArrayDataloader, register_bmz_model
 
 
 @register_bmz_model
@@ -176,9 +172,10 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
         # input_dtype = input_details[0]["dtype"]
         # sig = interpreter.get_signature_runner("serving_default")
         # result = sig(**{input_name: sample_input.astype(input_dtype)})
+        data = np.array([s.data.samples for s in batch_data], dtype=np.float32)
 
         model_outputs = self.tf_inference_handle(
-            **{self.tf_in_layer: batch_data.astype(self.tf_input_dtype)}
+            **{self.tf_in_layer: data.astype(self.tf_input_dtype)}
         )
 
         # opensoundscape uses reserved key -1 for model outputs e.g. during .predict()
