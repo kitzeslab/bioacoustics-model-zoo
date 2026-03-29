@@ -1,7 +1,10 @@
+from sys import platform
+
 from bioacoustics_model_zoo.utils import register_bmz_model
 from bioacoustics_model_zoo.tensorflow_wrapper import (
     TensorFlowModelWithPytorchClassifier,
 )
+import platform
 
 from pathlib import Path
 import pandas as pd
@@ -100,6 +103,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         # only require tensorflow and tensorflow_hub if/when this class is used
         try:
             import tensorflow_hub as hub
+            import tensorflow as tf
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
                 """Perch2 requires tensorflow and tensorflow_hub packages >=2.20.0.
@@ -192,6 +196,14 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 opensoundscape.Audio.normalize, is_augmentation=False, peak_level=0.25
             ),
         )
+
+        # if on a mac, disable XLA JIT to avoid TF hanging behavior (as of TF 2.21.0, March 2026)
+        if platform.system() == "Darwin":
+            warnings.warn(
+                "Disabling TensorFlow's XLA compilation (setting tf.config.optimizer.set_jit(False)) because otherwise "
+                "TF models on Mac hang at runtime as of Tensorflow 2.21.0"
+            )
+            tf.config.optimizer.set_jit(False)
 
     def _batch_forward(
         self, batch_data, return_dict=False, apply_custom_classifier=False
