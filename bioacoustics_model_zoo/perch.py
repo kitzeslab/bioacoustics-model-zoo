@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import urllib
 import torch
+import warnings
+import platform
 
 import opensoundscape
 from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
@@ -169,6 +171,14 @@ class Perch(TensorFlowModelWithPytorchClassifier):
                 opensoundscape.Audio.normalize, is_augmentation=False, peak_level=0.25
             ),
         )
+
+        # if on a mac, disable XLA JIT to avoid TF hanging behavior (as of TF 2.21.0, March 2026)
+        if platform.system() == "Darwin":
+            warnings.warn(
+                "Disabling TensorFlow's XLA compilation (setting tf.config.optimizer.set_jit(False)) because otherwise "
+                "TF models on Mac hang at runtime as of Tensorflow 2.21.0"
+            )
+            tf.config.optimizer.set_jit(False)
 
     def batch_forward(self, batch_data, return_dict=False):
         """run inference on a single batch of samples
