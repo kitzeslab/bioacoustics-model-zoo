@@ -93,6 +93,7 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
             embedding_size=1536,
             classes=list(range(14795)),  # class_lists["labels"]["classes"],
             sample_duration=5,
+            sample_rate=32000,
         )
 
         # which model to load depends on whether GPU is available
@@ -123,25 +124,10 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
         self.inference_dataloader_cls = AudioSampleArrayDataloader
         self.train_dataloader_cls = AudioSampleArrayDataloader
 
-        # Configure preprocessing
-        # Perch expects audio signal input as 32kHz mono 5s clips (160,000 samples)
-        self.sample_duration = 5
-        self.preprocessor = AudioAugmentationPreprocessor(
-            sample_duration=self.sample_duration, sample_rate=32000
-        )
-
-        # extend short samples to 5s by padding end with zeros (silence)
-        self.preprocessor.insert_action(
-            action_index="extend",
-            action=Action(
-                Audio.extend_to, is_augmentation=False, duration=self.sample_duration
-            ),
-        )
-
         # match the resampling method used by Perch / HopLite repo
         self.preprocessor.pipeline["load_audio"].params["resample_type"] = "polyphase"
 
-        # avoid invalid sample values outside of [-1,1]
+        # apply per-sample normalization to peak=0.25 to match Perch / HopLite repo preprocessing
         self.preprocessor.insert_action(
             action_index="normalize_signal",
             action=Action(

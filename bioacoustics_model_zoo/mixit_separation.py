@@ -4,8 +4,10 @@ from opensoundscape.audio import Audio
 from pathlib import Path
 import numpy as np
 import warnings
+from bioacoustics_model_zoo.utils import register_bmz_model
 
 
+@register_bmz_model
 class SeparationModel(object):
     def __init__(
         self,

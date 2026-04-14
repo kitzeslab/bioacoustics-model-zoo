@@ -161,8 +161,11 @@ class BirdsetPreprocessor(BasePreprocessor):
                 "overlay": (
                     Overlay(
                         is_augmentation=True,
-                        overlay_df=pd.DataFrame() if overlay_df is None else overlay_df,
+                        overlay_samples=(
+                            pd.DataFrame() if overlay_df is None else overlay_df
+                        ),
                         update_labels=True,
+                        break_on_key="overlay",
                     )
                 ),
                 # add vertical (time) and horizontal (frequency) masking bars

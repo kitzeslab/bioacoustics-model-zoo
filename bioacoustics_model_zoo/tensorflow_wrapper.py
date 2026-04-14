@@ -9,23 +9,19 @@ import torch
 import opensoundscape
 from opensoundscape.ml.cnn import CNN
 from opensoundscape.ml.shallow_classifier import MLPClassifier
-
-# TODO:
-# ONNX wrapper class
-# 1. consider moving this to opensoundscape.ml?
-# 2. separate wrappers for tflite vs full tf models?
-# 3. support training/fine-tuning the full tf model?
-# 4. support exporting the full model (tf + pytorch head) to ONNX or similar?
+from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
 
 
 class TensorFlowModelWithPytorchClassifier(CNN):
-    def __init__(self, embedding_size, classes, sample_duration):
+    def __init__(self, embedding_size, classes, sample_duration, sample_rate):
         """base class for TensorFlow models with trainable pytorch classifier head
 
         Args:
             embedding_size: int, size of the 1D feature vector output by the TensorFlow model
             classes: list of str, class names for the classifier
             sample_duration: float, duration of audio samples in seconds
+            sample_rate: int, target audio sample rate in Hz (resamples audio if not already at this sample rate)
+                - use None to skip resampling
         """
         # initialize a CNN where self.network is a pytorch classification head
         self.embedding_size = embedding_size
@@ -41,8 +37,14 @@ class TensorFlowModelWithPytorchClassifier(CNN):
         clf = MLPClassifier(
             input_size=embedding_size, output_size=len(self._custom_classes)
         )
+        # initialize class with a preprocessor that loads audio clips,
+        # resamples to correct sample rate, and extends short clips to correct sample duration
         super().__init__(
-            architecture=clf, classes=classes, sample_duration=sample_duration
+            architecture=clf,
+            classes=classes,
+            sample_duration=sample_duration,
+            sample_rate=sample_rate,
+            preprocessor_cls=AudioAugmentationPreprocessor,
         )
 
         self.tf_model = None  # set by subclass, holds the TensorFlow model

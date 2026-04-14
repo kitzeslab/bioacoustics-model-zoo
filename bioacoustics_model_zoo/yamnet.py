@@ -12,7 +12,9 @@ from tqdm.autonotebook import tqdm
 from opensoundscape import Audio, Action
 
 from bioacoustics_model_zoo.utils import register_bmz_model
-from bioacoustics_model_zoo.tensorflow_wrapper import TensorFlowModelWithPytorchClassifier
+from bioacoustics_model_zoo.tensorflow_wrapper import (
+    TensorFlowModelWithPytorchClassifier,
+)
 
 
 def class_names_from_csv(class_map_csv_text):
@@ -79,7 +81,10 @@ class YAMNet(TensorFlowModelWithPytorchClassifier):
                 "YAMNet requires tensorflow and tensorflow_hub packages to be installed. "
                 "Install in your python environment with `pip install tensorflow tensorflow_hub`"
             ) from exc
-        
+
+        # Load the model.
+        self.tf_model = tensorflow_hub.load(url)
+
         # load class list (based on example from https://tfhub.dev/google/yamnet/1)
         class_map_path = self.tf_model.class_map_path().numpy()
         class_names = class_names_from_csv(
@@ -90,21 +95,10 @@ class YAMNet(TensorFlowModelWithPytorchClassifier):
             embedding_size=1024,
             classes=class_names,
             sample_duration=input_duration,
+            sample_rate=16000,
         )
 
-        # Load the model.
-        self.tf_model = tensorflow_hub.load(url)
         self.sample_duration = self.input_duration = input_duration
-        self.preprocessor = AudioPreprocessor(
-            sample_duration=input_duration, sample_rate=16000
-        )
-        # extend short samples to input_duration by padding end with zeros (silence)
-        self.preprocessor.insert_action(
-            action_index="extend",
-            action=Action(
-                Audio.extend_to, is_augmentation=False, duration=input_duration
-            ),
-        )
         # the dataloader returns a list of AudioSample objects, with .data as audio waveform samples
         self.inference_dataloader_cls = YAMNetDataloader
         self.train_dataloader_cls = YAMNetDataloader

@@ -133,6 +133,7 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
             embedding_size=self.embedding_size,
             classes=classes,
             sample_duration=sample_duration,
+            sample_rate=48000,
         )
 
         # download model if URL, otherwise find it at local path:
@@ -158,17 +159,6 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         )
         self.tf_model.allocate_tensors()
 
-        # initialize preprocessor and choose dataloader class
-        self.preprocessor = AudioAugmentationPreprocessor(
-            sample_duration=sample_duration, sample_rate=48000
-        )
-        # extend short samples to 3s by padding end with zeros (silence)
-        self.preprocessor.insert_action(
-            action_index="extend",
-            action=Action(
-                Audio.extend_to, is_augmentation=False, duration=sample_duration
-            ),
-        )
         self.inference_dataloader_cls = AudioSampleArrayDataloader
         self.train_dataloader_cls = AudioSampleArrayDataloader
 

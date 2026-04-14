@@ -169,7 +169,9 @@ class Ensemble(torch.nn.Module):
 @register_bmz_model
 @register_model_cls
 class HawkEars(CNN):
-    """HawkEars Canadian bird classification CNN v0.1.0
+    """HawkEars Canadian bird classification CNN v1.0
+
+    Note that the Bioacoustics Model Zoo does not yet support HawkEars v2
 
     Hawkears[1] was developed by Jan Huus and is actively maintained on the
     [GitHub repository](https://github.com/jhuus/HawkEars1)
@@ -334,38 +336,24 @@ class HawkEars(CNN):
 
         # initialize the CNN object with this architecture and class list
         # use 3s duration and expected sample shape for HawkEars
+        # we copy the HawkEars spectroram creation implementation for consistency
         super().__init__(
             arch,
             classes=classes,
             sample_duration=cfg.audio.segment_len,
-            height=cfg.audio.spec_height,
-            width=cfg.audio.spec_width,
             channels=1,
+            sample_rate=cfg.audio.sampling_rate,
+            preprocessor_cls=AudioAugmentationPreprocessor,
         )
         self.class_codes = class_codes
         """4-letter alpha codes (or similar for non-birds) corresponding to self.classes"""
 
-        # compose the preprocessing pipeline:
-        # load audio with 3s framing; extend to 3s if needed
-        # create spectrogram based on config values, using same functions as HawkEars to ensure same results
-        # normalize spectrogram to max=1
-        pre = AudioAugmentationPreprocessor(
-            sample_duration=cfg.audio.segment_len, sample_rate=cfg.audio.sampling_rate
-        )
-        pre.insert_action(
-            action_index="extend",
-            action=Action(
-                Audio.extend_to, is_augmentation=False, duration=cfg.audio.segment_len
-            ),
-        )
-
         # note: can specify pre.pipeline.to_spec.device = 'cuda' to use cuda for spectrogram creation
         # but mps does not support spectrogram creation as of April 2024
-        pre.insert_action(
+        self.preprocessor.insert_action(
             action_index="to_spec",
             action=HawkEarsSpec(cfg=cfg, low_band=load_lowband_model),
         )
-        self.preprocessor = pre
 
         # set the classifier learning rate to be higher than the feature extractor
         # Note: I have not experimented to find optimal learning rates or relative learning rates

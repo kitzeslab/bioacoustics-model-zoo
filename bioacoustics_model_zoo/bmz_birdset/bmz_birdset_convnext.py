@@ -101,9 +101,14 @@ class BirdSetConvNeXT(SpectrogramClassifier):
         # use name_conversions github repo to convert between these codes and common/scientific names
         classes = [model.config.id2label[i] for i in range(model.num_labels)]
 
-        super().__init__(model, classes=classes, sample_duration=5)
+        super().__init__(
+            model,
+            classes=classes,
+            sample_duration=5,
+            sample_rate=32000,
+            preprocessor_cls=ConvNextBirdsetPreprocessor,
+        )
 
-        self.preprocessor = ConvNextBirdsetPreprocessor()
         self.network.to(self.device)
 
         # define default classifier, embedding, and gradcam layers

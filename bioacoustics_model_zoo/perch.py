@@ -137,7 +137,10 @@ class Perch(TensorFlowModelWithPytorchClassifier):
 
         # initialize parent class with methods for training custom classifier head
         super().__init__(
-            embedding_size=1280, classes=taxonomic_classes["species"], sample_duration=5
+            embedding_size=1280,
+            classes=taxonomic_classes["species"],
+            sample_duration=5,
+            sample_rate=32000,
         )
         self.version = version
         self.taxonomic_classes = taxonomic_classes
@@ -145,23 +148,8 @@ class Perch(TensorFlowModelWithPytorchClassifier):
         self.inference_dataloader_cls = AudioSampleArrayDataloader
         self.train_dataloader_cls = AudioSampleArrayDataloader
 
-        # Configure preprocessing
-        # Perch expects audio signal input as 32kHz mono 5s clips (160,000 samples)
-        self.preprocessor = AudioAugmentationPreprocessor(
-            sample_duration=5, sample_rate=32000
-        )
-        self.sample_duration = 5
-
         # match the resampling method used by Perch / HopLite repo
         self.preprocessor.pipeline["load_audio"].params["resample_type"] = "polyphase"
-
-        # extend short samples to 5s by padding end with zeros (silence)
-        self.preprocessor.insert_action(
-            action_index="extend",
-            action=Action(
-                Audio.extend_to, is_augmentation=False, duration=self.sample_duration
-            ),
-        )
 
         # perch preprocessing normalizes audio to peak = 0.25
         # https://github.com/kitzeslab/bioacoustics-model-zoo/issues/30#issuecomment-3134186126
@@ -277,12 +265,10 @@ class Perch(TensorFlowModelWithPytorchClassifier):
         genus_logits = []
         logmelspec = []
         custom_classifier_logits = []
-        for i, (samples_batch, _) in enumerate(
-            tqdm(dataloader, disable=not progress_bar)
-        ):
+        for i, batch_samples in enumerate(tqdm(dataloader, disable=not progress_bar)):
             # _batch_forward returns dict with tf model outputs + custom classifier
             # logits if self.use_custom_classifier=True
-            outs = self.batch_forward(samples_batch, return_dict=True)
+            outs = self.batch_forward(batch_samples, return_dict=True)
 
             # only aggregate the outputs requested to save memory
             if return_value != "embeddings":

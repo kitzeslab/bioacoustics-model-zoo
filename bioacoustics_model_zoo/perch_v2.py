@@ -152,9 +152,14 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 f"Failed to load Perch2 model from TensorFlow Hub at {tfhub_path}. "
             ) from e
         model_path = hub.resolve(tfhub_path)
-        class_lists_glob = (Path(model_path) / "assets").glob("*.csv")
+        csv_files = [
+            f
+            for f in (Path(model_path) / "assets").glob("*.csv")
+            if not f.name.startswith(".")
+        ]
+
         class_lists = {}
-        for class_list_path in class_lists_glob:
+        for class_list_path in csv_files:
             try:
                 class_list_name = class_list_path.stem
                 df = pd.read_csv(class_list_path)
@@ -174,27 +179,13 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             embedding_size=1536,
             classes=class_lists["labels"]["classes"],
             sample_duration=5,
+            sample_rate=32000,
         )
         self.version = version
         self.ebird_codes = class_lists["perch_v2_ebird_classes"]["classes"]
         self.tf_model = tf_model
         self.inference_dataloader_cls = AudioSampleArrayDataloader
         self.train_dataloader_cls = AudioSampleArrayDataloader
-
-        # Configure preprocessing
-        # Perch expects audio signal input as 32kHz mono 5s clips (160,000 samples)
-        self.preprocessor = AudioAugmentationPreprocessor(
-            sample_duration=5, sample_rate=32000
-        )
-        self.sample_duration = 5
-
-        # extend short samples to 5s by padding end with zeros (silence)
-        self.preprocessor.insert_action(
-            action_index="extend",
-            action=Action(
-                Audio.extend_to, is_augmentation=False, duration=self.sample_duration
-            ),
-        )
 
         # match the resampling method used by Perch / HopLite repo
         self.preprocessor.pipeline["load_audio"].params["resample_type"] = "polyphase"

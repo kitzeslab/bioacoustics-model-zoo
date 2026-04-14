@@ -3,6 +3,7 @@ import opensoundscape
 from opensoundscape.ml.cnn_architectures import resnet18
 import torch
 from bioacoustics_model_zoo.utils import register_bmz_model
+import warnings
 
 
 @register_bmz_model
@@ -37,6 +38,7 @@ class RanaSierraeCNN(_CNN):
             sample_duration=2.0,
             single_target=True,
             channels=3,
+            sample_rate=None,
         )
 
         # modify preprocessing of the CNN:
