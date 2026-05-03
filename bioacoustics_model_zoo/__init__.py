@@ -1,4 +1,4 @@
-__version__ = "0.12.3"
+__version__ = "0.13.0"
 
 import torch
 from bioacoustics_model_zoo import utils
@@ -161,13 +161,11 @@ class MissingBirdSetDependency:
     """
 
     def __init__(self, *args, **kwargs):
-        raise ImportError(
-            """BirdSetConvNeXT dependency missing!
+        raise ImportError("""BirdSetConvNeXT dependency missing!
 
             try:
             pip install torch torchaudio torchvision transformers
-            """
-        )
+            """)
 
 
 if transformers is None or torchaudio is None:
