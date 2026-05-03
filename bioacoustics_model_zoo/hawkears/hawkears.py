@@ -341,7 +341,6 @@ class HawkEars(CNN):
             arch,
             classes=classes,
             sample_duration=cfg.audio.segment_len,
-            channels=1,
             sample_rate=cfg.audio.sampling_rate,
             preprocessor_cls=AudioAugmentationPreprocessor,
         )

@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import kagglehub
 import pandas as pd
 import numpy as np
 import urllib
+import tensorflow
 import torch
 import warnings
 import platform
@@ -97,24 +99,25 @@ class Perch(TensorFlowModelWithPytorchClassifier):
 
         self.version = version
 
-        tfhub_paths = {
-            4: "https://www.kaggle.com/models/google/bird-vocalization-classifier/TensorFlow2/bird-vocalization-classifier/4",
-            8: "https://www.kaggle.com/models/google/bird-vocalization-classifier/TensorFlow2/bird-vocalization-classifier/8",
+        kagglehub_handles = {
+            4: "google/bird-vocalization-classifier/TensorFlow2/bird-vocalization-classifier/4",
+            8: "google/bird-vocalization-classifier/TensorFlow2/bird-vocalization-classifier/8",
         }
 
         if path is None:
-            path = tfhub_paths[version]
+            path = kagglehub_handles[version]
 
         # Load pre-trained model: handle url from tfhub or local dir
-        if urllib.parse.urlparse(path).scheme in ("http", "https"):
-            # its a url, load from tfhub
-            tf_model = tensorflow_hub.load(path)
+        if path.startswith("google/"):
+            # load from kagglehub
+            model_path = kagglehub.model_download(path)
+            tf_model = tensorflow.saved_model.load(model_path)
 
             # load lists of taxonomic levels
-            label_csv = tensorflow_hub.resolve(path) + "/assets/label.csv"
-            order_csv = tensorflow_hub.resolve(path) + "/assets/order.csv"
-            family_csv = tensorflow_hub.resolve(path) + "/assets/family.csv"
-            genus_csv = tensorflow_hub.resolve(path) + "/assets/genus.csv"
+            label_csv = Path(model_path) / "assets/label.csv"
+            order_csv = Path(model_path) / "assets/order.csv"
+            family_csv = Path(model_path) / "assets/family.csv"
+            genus_csv = Path(model_path) / "assets/genus.csv"
 
         else:
             # must be a local directory containing /savedmodel/saved_model.pb and

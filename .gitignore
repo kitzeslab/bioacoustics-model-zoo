@@ -8,3 +8,4 @@ bioacoustics_model_zoo/birdset/configs
 .locks
 dist/
 bioacoustics_model_zoo/debugging_notebooks/
+tmp/test_cache/

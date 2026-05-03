@@ -27,7 +27,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.9, <3.14"
+python = ">=3.10, <3.14"
 opensoundscape = ">=0.11.2"
 PyGithub = ">=2.6.1"
 
@@ -41,16 +41,17 @@ torchvision = {version = ">=0.14.0", optional = true}
 torchaudio = {version = ">=0.13.0", optional = true}
 timm = {version = ">=0.9.0", optional = true}
 transformers = {version = ">=4.20.0", optional = true}
+kagglehub = {version = ">=1.0.0", optional = true}
 
 [tool.poetry.extras]
 tensorflow = ["tensorflow", "tensorflow-hub", "tf-keras"]
-perch = ["tensorflow", "tensorflow-hub", "tf-keras"]
-perch2 = ["tensorflow", "tensorflow-hub", "tf-keras"]
+perch = ["tensorflow", "kagglehub", "tf-keras"]
+perch2 = ["tensorflow", "kagglehub", "tf-keras"]
 birdnet = ["ai-edge-litert"]
 hawkears = ["torch", "torchvision", "torchaudio", "timm"]
 birdset = ["torch", "torchvision", "torchaudio", "transformers"]
 pytorch = ["torch", "torchvision", "torchaudio"]
-all = ["tensorflow", "tensorflow-hub", "ai-edge-litert", "torch", "torchvision", "torchaudio", "timm", "transformers"]
+all = ["tensorflow", "tensorflow-hub", "kagglehub", "ai-edge-litert", "torch", "torchvision", "torchaudio", "timm", "transformers"]
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
@@ -59,6 +60,7 @@ requests-mock = "^1.11.0"
 # Include all optional dependencies for development
 tensorflow = ">=2.13.0"
 tensorflow-hub = ">=0.14.0"
+kagglehub = ">=1.0.0"
 ai-edge-litert = ">=1.0.0,!=1.4.0"
 torch = ">=1.13.0"
 torchvision = ">=0.14.0"

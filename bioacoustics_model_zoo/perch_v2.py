@@ -1,5 +1,8 @@
 from sys import platform
 
+import kagglehub
+import tensorflow
+
 from bioacoustics_model_zoo.utils import register_bmz_model
 from bioacoustics_model_zoo.tensorflow_wrapper import (
     TensorFlowModelWithPytorchClassifier,
@@ -130,12 +133,14 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 version = 2  # latest GPU-compatible as of Oct 2025
             tested_versions = (2,)  # as of Jan 2026
 
-            tfhub_path = f"https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2/{version}"
+            handle = (
+                f"google/bird-vocalization-classifier/tensorFlow2/perch_v2/{version}"
+            )
         else:
             if version is None:
                 version = 1  # latest CPU-compatible as of Oct 2025
             tested_versions = (1,)  # as of Jan 2026
-            tfhub_path = f"https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2_cpu/{version}"
+            handle = f"google/bird-vocalization-classifier/tensorFlow2/perch_v2_cpu/{version}"
 
         self.device = device
         self.version = version
@@ -144,14 +149,13 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 f"version {version} has not been tested on {device}, tested versions: {tested_versions}"
             )
 
-        # first try hub.load(url): succeeds to download but fails to find file within subfolder
         try:
-            tf_model = hub.load(tfhub_path)
+            model_path = kagglehub.model_download(handle)
+            tf_model = tensorflow.saved_model.load(model_path)
         except Exception as e:
             raise RuntimeError(
-                f"Failed to load Perch2 model from TensorFlow Hub at {tfhub_path}. "
+                f"Failed to load Perch2 model from KaggleHub at {handle}. "
             ) from e
-        model_path = hub.resolve(tfhub_path)
         csv_files = [
             f
             for f in (Path(model_path) / "assets").glob("*.csv")
@@ -229,22 +233,22 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         data = np.array([s.data.samples for s in batch_samples], dtype=np.float32)
         model_outputs = self.tf_model.signatures["serving_default"](inputs=data)
 
+        if "custom_classifier_logits" in targets or self.use_custom_classifier:
+            emb_tensor = torch.tensor(model_outputs["embedding"]).to(self.device)
+            self.network.to(self.device)
+            custom_classifier_logits = self.network(emb_tensor).detach().cpu().numpy()
+            model_outputs["custom_classifier_logits"] = custom_classifier_logits
+
         # opensoundscape uses reserved key -1 for model outputs e.g. during .predict()
         if -1 in targets:
-            model_outputs[-1] = model_outputs["label"]
-
-        if "custom_classifier_logits" in targets:
-            emb_tensor = torch.tensor(model_outputs["embedding"].numpy()).to(
-                self.device
-            )
-            self.network.to(self.device)
-            model_outputs["custom_classifier_logits"] = (
-                self.network(emb_tensor).detach().cpu()
-            )
+            if self.use_custom_classifier:
+                model_outputs[-1] = model_outputs["custom_classifier_logits"]
+            else:
+                model_outputs[-1] = model_outputs["label"]
 
         # only retaining requested outputs
         model_outputs = {
-            k: None if v is None else v.numpy()
+            k: None if v is None else np.array(v)
             for k, v in model_outputs.items()
             if k in targets
         }

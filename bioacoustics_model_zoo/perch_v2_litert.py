@@ -100,7 +100,6 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
         model_path = str(Path(model_path).resolve())  # get absolute path as string
         assert Path(model_path).exists(), f"Model path {model_path} does not exist"
 
-        # first try hub.load(url): succeeds to download but fails to find file within subfolder
         self.tf_model = Interpreter(
             model_path=model_path,
             num_threads=num_tflite_threads,
