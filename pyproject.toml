@@ -28,7 +28,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = ">=3.10, <3.14"
-opensoundscape = ">=0.11.2"
+opensoundscape = "~=0.13.0"
 PyGithub = ">=2.6.1"
 
 # Optional dependencies for specific models
