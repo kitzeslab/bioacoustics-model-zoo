@@ -149,13 +149,18 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 f"version {version} has not been tested on {device}, tested versions: {tested_versions}"
             )
 
-        try:
-            model_path = kagglehub.model_download(handle)
-            tf_model = tensorflow.saved_model.load(model_path)
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to load Perch2 model from KaggleHub at {handle}. "
-            ) from e
+        # tensorflow tends to choose the device automatically, so to manually select between CPU and GPU we need to use the tf.device
+        # context manager both when the model is loaded and when the model forward call is made
+        self.tf_device = "CPU" if self.device.type == "cpu" else "GPU"
+        self.tf = tf # since TF isn't imported globally, we have to store it's handle to use in the forward call
+        with self.tf.device(self.tf_device):
+            try:
+                model_path = kagglehub.model_download(handle)
+                tf_model = tensorflow.saved_model.load(model_path)
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to load Perch2 model from KaggleHub at {handle}. "
+                ) from e
         csv_files = [
             f
             for f in (Path(model_path) / "assets").glob("*.csv")
@@ -231,7 +236,10 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             dict with keys matching targets, values are np.arrays of outputs
         """
         data = np.array([s.data.samples for s in batch_samples], dtype=np.float32)
-        model_outputs = self.tf_model.signatures["serving_default"](inputs=data)
+
+        # call model in context manager so it actually uses the CPU (even if a GPU is available)
+        with self.tf.device(self.tf_device):
+            model_outputs = self.tf_model.signatures["serving_default"](inputs=data)
 
         if "custom_classifier_logits" in targets or self.use_custom_classifier:
             emb_tensor = torch.tensor(model_outputs["embedding"]).to(self.device)
