@@ -260,7 +260,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         samples,
         progress_bar=True,
         wandb_session=None,
-        targets=("logits", "embeddings", "spatial_embeddings", "spectrograms"),
+        targets=("logit", "embedding", "spatial_embedding", "spectrogram"),
         return_dfs=True,
         **dataloader_kwargs,
     ):
