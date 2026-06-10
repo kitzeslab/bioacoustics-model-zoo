@@ -110,7 +110,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 Note that different models are downloaded from TF Hub for GPU vs CPU usage.
                 - default [None]: uses GPU if available, otherwise CPU
                 - 'cpu': forces CPU usage
-                - 'gpu': forces GPU usage
+                - 'cuda': forces GPU usage
 
         """
         # only require tensorflow and tensorflow_hub if/when this class is used
@@ -127,8 +127,8 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
         # which model to load depends on whether GPU is available
         if device is None:
-            device = "gpu" if torch.cuda.is_available() else "cpu"
-        if device == "gpu":
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        if device in {"cuda", "xla"} :
             if version is None:
                 version = 2  # latest GPU-compatible as of Oct 2025
             tested_versions = (2,)  # as of Jan 2026
