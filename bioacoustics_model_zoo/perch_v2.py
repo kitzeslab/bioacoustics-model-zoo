@@ -99,6 +99,14 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         opensoundscape.ml.cnn.SpectrogramClassifier.similarity_search_hoplite_db
     )
 
+    # dict mapping the keys of the Perch2 tensorflow model to the expected keys
+    model_output_key_mapping = {
+        "label":"logits",
+        "embedding":"embeddings",
+        "spatial_embedding":"spatial_embeddings",
+        "spectrogram":"spectrograms"
+    }
+
     def __init__(self, version=None, device=None):
         """initialize Perch2 BMZ model from TensorFlow Hub
 
@@ -219,7 +227,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     def batch_forward(
         self,
         batch_samples,
-        targets=("embedding", "spatial_embedding", "label", "spectrogram"),
+        targets=("logits", "embeddings", "spatial_embeddings", "spectrograms"),
         avgpool=False,
     ):
         """run inference on a single batch of samples
@@ -229,7 +237,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         Args:
             batch_data: np.array of audio samples, shape (batch_size, 32000*5)
             targets: tuple of str, select from
-                ['embedding', 'spatial_embedding', 'label', 'spectrogram','custom_classifier_logits']
+                ['embeddings', 'spatial_embeddings', 'labels', 'spectrograms','custom_classifier_logits']
                 - 'custom_classifier_logits' is the result of self.network() on the embeddings
             avgpool: ignored
         Returns:
@@ -241,8 +249,15 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         with self.tf.device(self.tf_device):
             model_outputs = self.tf_model.signatures["serving_default"](inputs=data)
 
+        # map actual output keys to expected ones
+        key_mapping_dict = type(self).model_output_key_mapping
+        model_outputs = {
+            (key_mapping_dict[k] if k in key_mapping_dict.keys() else k) : v
+            for k, v in model_outputs.items()
+        }
+
         if "custom_classifier_logits" in targets or self.use_custom_classifier:
-            emb_tensor = torch.tensor(model_outputs["embedding"]).to(self.device)
+            emb_tensor = torch.tensor(model_outputs["embeddings"]).to(self.device)
             self.network.to(self.device)
             custom_classifier_logits = self.network(emb_tensor).detach().cpu().numpy()
             model_outputs["custom_classifier_logits"] = custom_classifier_logits
@@ -252,7 +267,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             if self.use_custom_classifier:
                 model_outputs[-1] = model_outputs["custom_classifier_logits"]
             else:
-                model_outputs[-1] = model_outputs["label"]
+                model_outputs[-1] = model_outputs["logits"]
 
         # only retaining requested outputs
         model_outputs = {
@@ -268,7 +283,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         samples,
         progress_bar=True,
         wandb_session=None,
-        targets=("logit", "embedding", "spatial_embedding", "spectrogram"),
+        targets=("logits", "embeddings", "spatial_embeddings", "spectrograms"),
         return_dfs=True,
         **dataloader_kwargs,
     ):
