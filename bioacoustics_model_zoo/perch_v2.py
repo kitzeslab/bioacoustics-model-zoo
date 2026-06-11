@@ -159,9 +159,8 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
         # tensorflow tends to choose the device automatically, so to manually select between CPU and GPU we need to use the tf.device
         # context manager both when the model is loaded and when the model forward call is made
-        self.tf_device = "CPU" if self.device.type == "cpu" else "GPU"
-        self.tf = tf # since TF isn't imported globally, we have to store it's handle to use in the forward call
-        with self.tf.device(self.tf_device):
+        self.tf_device = tf.device("CPU" if self.device.type == "cpu" else "GPU")
+        with self.tf_device:
             try:
                 model_path = kagglehub.model_download(handle)
                 tf_model = tensorflow.saved_model.load(model_path)
@@ -246,7 +245,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         data = np.array([s.data.samples for s in batch_samples], dtype=np.float32)
 
         # call model in context manager so it actually uses the CPU (even if a GPU is available)
-        with self.tf.device(self.tf_device):
+        with self.tf_device:
             model_outputs = self.tf_model.signatures["serving_default"](inputs=data)
 
         # map actual output keys to expected ones
