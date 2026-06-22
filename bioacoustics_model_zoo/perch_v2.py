@@ -99,6 +99,14 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         opensoundscape.ml.cnn.SpectrogramClassifier.similarity_search_hoplite_db
     )
 
+    # dict mapping the keys of the Perch2 tensorflow model to the expected keys
+    model_output_key_mapping = {
+        "label":"logits",
+        "embedding":"embeddings",
+        "spatial_embedding":"spatial_embeddings",
+        "spectrogram":"spectrograms"
+    }
+
     def __init__(self, version=None, device=None):
         """initialize Perch2 BMZ model from TensorFlow Hub
 
@@ -110,7 +118,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 Note that different models are downloaded from TF Hub for GPU vs CPU usage.
                 - default [None]: uses GPU if available, otherwise CPU
                 - 'cpu': forces CPU usage
-                - 'gpu': forces GPU usage
+                - 'cuda': forces GPU usage
 
         """
         # only require tensorflow and tensorflow_hub if/when this class is used
@@ -127,8 +135,8 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
         # which model to load depends on whether GPU is available
         if device is None:
-            device = "gpu" if torch.cuda.is_available() else "cpu"
-        if device == "gpu":
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        if device in {"cuda", "xla"} :
             if version is None:
                 version = 2  # latest GPU-compatible as of Oct 2025
             tested_versions = (2,)  # as of Jan 2026
@@ -149,13 +157,17 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 f"version {version} has not been tested on {device}, tested versions: {tested_versions}"
             )
 
-        try:
-            model_path = kagglehub.model_download(handle)
-            tf_model = tensorflow.saved_model.load(model_path)
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to load Perch2 model from KaggleHub at {handle}. "
-            ) from e
+        # tensorflow tends to choose the device automatically, so to manually select between CPU and GPU we need to use the tf.device
+        # context manager both when the model is loaded and when the model forward call is made
+        self.tf_device = tf.device("CPU" if self.device.type == "cpu" else "GPU")
+        with self.tf_device:
+            try:
+                model_path = kagglehub.model_download(handle)
+                tf_model = tensorflow.saved_model.load(model_path)
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to load Perch2 model from KaggleHub at {handle}. "
+                ) from e
         csv_files = [
             f
             for f in (Path(model_path) / "assets").glob("*.csv")
@@ -214,7 +226,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     def batch_forward(
         self,
         batch_samples,
-        targets=("embedding", "spatial_embedding", "label", "spectrogram"),
+        targets=("logits", "embeddings", "spatial_embeddings", "spectrograms"),
         avgpool=False,
     ):
         """run inference on a single batch of samples
@@ -224,17 +236,27 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         Args:
             batch_data: np.array of audio samples, shape (batch_size, 32000*5)
             targets: tuple of str, select from
-                ['embedding', 'spatial_embedding', 'label', 'spectrogram','custom_classifier_logits']
+                ['embeddings', 'spatial_embeddings', 'labels', 'spectrograms','custom_classifier_logits']
                 - 'custom_classifier_logits' is the result of self.network() on the embeddings
             avgpool: ignored
         Returns:
             dict with keys matching targets, values are np.arrays of outputs
         """
         data = np.array([s.data.samples for s in batch_samples], dtype=np.float32)
-        model_outputs = self.tf_model.signatures["serving_default"](inputs=data)
+
+        # call model in context manager so it actually uses the CPU (even if a GPU is available)
+        with self.tf_device:
+            model_outputs = self.tf_model.signatures["serving_default"](inputs=data)
+
+        # map actual output keys to expected ones
+        key_mapping_dict = type(self).model_output_key_mapping
+        model_outputs = {
+            (key_mapping_dict[k] if k in key_mapping_dict.keys() else k) : v
+            for k, v in model_outputs.items()
+        }
 
         if "custom_classifier_logits" in targets or self.use_custom_classifier:
-            emb_tensor = torch.tensor(model_outputs["embedding"]).to(self.device)
+            emb_tensor = torch.tensor(model_outputs["embeddings"]).to(self.device)
             self.network.to(self.device)
             custom_classifier_logits = self.network(emb_tensor).detach().cpu().numpy()
             model_outputs["custom_classifier_logits"] = custom_classifier_logits
@@ -244,7 +266,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             if self.use_custom_classifier:
                 model_outputs[-1] = model_outputs["custom_classifier_logits"]
             else:
-                model_outputs[-1] = model_outputs["label"]
+                model_outputs[-1] = model_outputs["logits"]
 
         # only retaining requested outputs
         model_outputs = {
