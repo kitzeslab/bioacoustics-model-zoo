@@ -99,13 +99,6 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         opensoundscape.ml.cnn.SpectrogramClassifier.similarity_search_hoplite_db
     )
 
-    # dict mapping the keys of the Perch2 tensorflow model to the expected keys
-    model_output_key_mapping = {
-        "label":"logits",
-        "embedding":"embeddings",
-        "spatial_embedding":"spatial_embeddings",
-        "spectrogram":"spectrograms"
-    }
 
     def __init__(self, version=None, device=None):
         """initialize Perch2 BMZ model from TensorFlow Hub
@@ -226,7 +219,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     def batch_forward(
         self,
         batch_samples,
-        targets=("logits", "embeddings", "spatial_embeddings", "spectrograms"),
+        targets=("label", "embedding", "spatial_embedding", "spectrogram"),
         avgpool=False,
     ):
         """run inference on a single batch of samples
@@ -236,7 +229,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         Args:
             batch_data: np.array of audio samples, shape (batch_size, 32000*5)
             targets: tuple of str, select from
-                ['embeddings', 'spatial_embeddings', 'labels', 'spectrograms','custom_classifier_logits']
+                ['embedding', 'spatial_embedding', 'labels', 'spectrogram','custom_classifier_logits']
                 - 'custom_classifier_logits' is the result of self.network() on the embeddings
             avgpool: ignored
         Returns:
@@ -248,15 +241,8 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         with self.tf_device:
             model_outputs = self.tf_model.signatures["serving_default"](inputs=data)
 
-        # map actual output keys to expected ones
-        key_mapping_dict = type(self).model_output_key_mapping
-        model_outputs = {
-            (key_mapping_dict[k] if k in key_mapping_dict.keys() else k) : v
-            for k, v in model_outputs.items()
-        }
-
         if "custom_classifier_logits" in targets or self.use_custom_classifier:
-            emb_tensor = torch.tensor(model_outputs["embeddings"]).to(self.device)
+            emb_tensor = torch.tensor(model_outputs["embedding"]).to(self.device)
             self.network.to(self.device)
             custom_classifier_logits = self.network(emb_tensor).detach().cpu().numpy()
             model_outputs["custom_classifier_logits"] = custom_classifier_logits
@@ -266,7 +252,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             if self.use_custom_classifier:
                 model_outputs[-1] = model_outputs["custom_classifier_logits"]
             else:
-                model_outputs[-1] = model_outputs["logits"]
+                model_outputs[-1] = model_outputs["label"]
 
         # only retaining requested outputs
         model_outputs = {
@@ -282,7 +268,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         samples,
         progress_bar=True,
         wandb_session=None,
-        targets=("logits", "embeddings", "spatial_embeddings", "spectrograms"),
+        targets=("label", "embedding", "spatial_embedding", "spectrogram"),
         return_dfs=True,
         **dataloader_kwargs,
     ):
@@ -299,14 +285,14 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             samples: list of file paths, OR pd.DataFrame with index containing audio file paths
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
             wandb_session: wandb.Session object, if provided, logs progress
-            targets: tuple(str,): select from 'logits', 'embeddings',
-                'spatial_embeddings', 'spectrograms', 'custom_classifier_logits'
-                [default: ('logits','embeddings','spatial_embeddings','spectrograms')]
+            targets: tuple(str,): select from 'label', 'embedding',
+                'spatial_embedding', 'spectrogram', 'custom_classifier_logits'
+                [default: ('label','embedding','spatial_embedding','spectrogram')]
                 Include any combination of the following:
-                - 'logits': logit scores (class predictions) on the species classes
-                - 'embeddings': 1D feature vectors from the penultimate layer of the network
-                - 'spatial_embeddings': un-pooled spatial embeddings from the network
-                - 'spectrograms': log-mel spectrograms generated during preprocessing
+                - 'label': logit scores (class predictions) on the species classes
+                - 'embedding': 1D feature vectors from the penultimate layer of the network
+                - 'spatial_embedding': un-pooled spatial embeddings from the network
+                - 'spectrogram': log-mel spectrograms generated during preprocessing
                 - 'custom_classifier_logits': outputs of the custom classifier head (self.network)
             return_dfs: bool, if True, returns outputs as pd.DataFrame with multi-index like
                 .predict() ('file','start_time','end_time'), if False, returns np.array
@@ -315,11 +301,11 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 as batch_size, num_workers, etc.
 
         Returns: dictionary with content depending on return_values and return_dfs arguments:
-            - 'logits': pd.DataFrame or np.array of per-clip logits on species classes
+            - 'label': pd.DataFrame or np.array of per-clip logits on species classes
                 shape: (num_clips, num_classes)
-            - 'embeddings': pd.DataFrame or np.array of per-clip 1D feature vectors
+            - 'embedding': pd.DataFrame or np.array of per-clip 1D feature vectors
                 shape: (num_clips, 1536)
-            - 'spatial_embeddings': np.array of per-clip spatial embeddings
+            - 'spatial_embedding': np.array of per-clip spatial embeddings
                 shape: (num_clips, 5, 3, 1536)
             - 'custom_classifier_logits': pd.DataFrame or np.array of per-clip logits from the
                 custom classifier head, shape: (num_clips, num_custom_classes)
@@ -339,15 +325,15 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         # optionally put 1D outputs in DataFrames with multi-index ('file','start_time','end_time')
         # and appropriate column names
         if return_dfs:
-            if "logits" in results_dict:
-                results_dict["logits"] = pd.DataFrame(
-                    data=results_dict["logits"],
+            if "label" in results_dict:
+                results_dict["label"] = pd.DataFrame(
+                    data=results_dict["label"],
                     index=dataloader.dataset.dataset.label_df.index,
                     columns=self._original_classes,
                 )
-            if "embeddings" in results_dict:
-                results_dict["embeddings"] = pd.DataFrame(
-                    data=results_dict["embeddings"],
+            if "embedding" in results_dict:
+                results_dict["embedding"] = pd.DataFrame(
+                    data=results_dict["embedding"],
                     index=dataloader.dataset.dataset.label_df.index,
                     columns=None,
                 )
