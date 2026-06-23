@@ -22,17 +22,26 @@ from bioacoustics_model_zoo.tensorflow_wrapper import (
 )
 
 
+BIRDNET_HF_HANDLES = {
+    "2.4":{
+        "repo_id": "sammlapp/BirdNET_v2.4",
+        "tflite_FP16_checkpoint": "V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP16.tflite",
+        "tflite_FP32_checkpoint":"V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP32.tflite",
+        "tflite_FP16_metamodel": "V2.4/BirdNET_GLOBAL_6K_V2.4_MData_Model_FP16.tflite",
+        "labels":"V2.4/BirdNET_GLOBAL_6K_V2.4_Labels.txt",
+        "tf_model": "V2.4/BirdNET_GLOBAL_6K_V2.4_Model",
+    }
+}
 @register_bmz_model
 class BirdNET(TensorFlowModelWithPytorchClassifier):
     def __init__(
         self,
-        checkpoint_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP16.tflite",
-        label_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt",
-        num_tflite_threads=1,
-        cache_dir=None,
         version="2.4",
+        tflite_path=None,
+        label_path=None,
+        num_tflite_threads=1,
     ):
-        """load BirdNET global bird classification CNN from .tflite file on GitHub
+        """load BirdNET global bird classification CNN
 
         [BirdNET](https://github.com/kahst/BirdNET-Analyzer) is shared under the CC A-NC-SA 4.0.
         Suggested Citation:
@@ -49,26 +58,21 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         BirdNET Analyzer provides good api: https://github.com/kahst/BirdNET-Analyzer/blob/main/model.py
         This wrapper may be useful for those already using OpenSoundscape and looking for a consistent API
 
-        Dependencies:
+        Dependencies: ai-edge-litert or tensorflow (for tflite interpreter)
 
-        Tensorflow can be finicky about compatible versions of packages. This combination of packages works:
-        ```
-        tensorflow==2.14.0
-        tensorflow-estimator==2.14.0
-        tensorflow-hub==0.14.0
-        tensorflow-io-gcs-filesystem==0.34.0
-        tensorflow-macos==2.14.0
-        ```
+        Tensorflow can be finicky about compatible versions of packages. Contact a developer if you have trouble installing or running BirdNET.
 
         Args:
-            checkpoint_url: url to .tflite checkpoint on GitHub, or a local path to the .tflite file
-            label_url: url to .txt file with class labels, or a local path to the .txt file
-            num_tflite_threads: number of threads for TFLite interpreter
-            cache_dir: directory to cache downloaded files (uses default cache if None)
             version: only '2.4' is currently supported for automatic download. However,
                 if you are specifying checkpoint downloads or local paths for version other than
                 2.4, pass the BirdNet model version to correctly set the model.version attribute
-                (used for model caching).
+            tflite_path: default None downloads the BirdNET FP16 model from HuggingFace. 
+                Can also be a local path to a .tflite file 
+            label_path: default None downloads the BirdNET labels.txt from HuggingFace.
+                Can also be a local path to a .txt file
+            num_tflite_threads: number of threads for TFLite interpreter
+            
+        Note: Caching is managed by huggingface_hub
 
         Returns:
             model object with methods for generating predictions and embeddings
@@ -88,9 +92,10 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
         """
         self.version = str(version)
 
-        # only require tensorflow if/when this class is used
+        # only require dependencies if/when this class is used
         try:
             import ai_edge_litert.interpreter as tflite
+            import huggingface_hub
 
             resolver = tflite.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES
         except ModuleNotFoundError as exc:
@@ -100,23 +105,27 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
                 resolver = tflite.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES
             except ModuleNotFoundError as exc:
                 raise ModuleNotFoundError(
-                    "BirdNet requires tensorflow package to be installed. "
+                    "BirdNet requires tensorflow or ai-edge-litert package to be installed. "
                     "Install in your python environment with `pip install tensorflow`"
                 ) from exc
 
-        # load class list:
-        if label_url.startswith("http"):
-            label_path = download_cached_file(
-                label_url,
-                filename=None,
-                model_name="birdnet",
-                model_version=self.version,
-                cache_dir=cache_dir,
+        # load class list and model from HuggingFace if not provided as local paths
+        if label_path is None:
+            label_path = huggingface_hub.hf_hub_download(
+                repo_id=BIRDNET_HF_HANDLES[self.version]["repo_id"],
+                filename=BIRDNET_HF_HANDLES[self.version]["labels"]
+            )
+        else: # assert local path exists
+            label_path = Path(label_path).resolve()
+            assert label_path.exists(), f"Label path {label_path} does not exist"
+        if tflite_path is None:
+            tflite_path = huggingface_hub.hf_hub_download(
+                repo_id=BIRDNET_HF_HANDLES[self.version]["repo_id"],
+                filename=BIRDNET_HF_HANDLES[self.version]["tflite_FP16_checkpoint"]
             )
         else:
-            label_path = label_url
-        label_path = Path(label_path).resolve()  # get absolute path
-        assert label_path.exists(), f"Label path {label_path} does not exist"
+            tflite_path = Path(tflite_path).resolve()
+            assert tflite_path.exists(), f"Model path {tflite_path} does not exist"
 
         # labels.txt is a single column of class names without a header
         classes = pd.read_csv(label_path, header=None)[0].values
@@ -136,24 +145,8 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
             sample_rate=48000,
         )
 
-        # download model if URL, otherwise find it at local path:
-        if checkpoint_url.startswith("http"):
-            print("downloading model from URL...")
-            model_path = download_cached_file(
-                checkpoint_url,
-                filename=None,
-                model_name="birdnet",
-                model_version=self.version,
-                cache_dir=cache_dir,
-            )
-        else:
-            model_path = checkpoint_url
-
-        model_path = str(Path(model_path).resolve())  # get absolute path as string
-        assert Path(model_path).exists(), f"Model path {model_path} does not exist"
-
         self.tf_model = tflite.Interpreter(
-            model_path=model_path,
+            model_path=tflite_path,
             num_threads=num_tflite_threads,
             experimental_op_resolver_type=resolver,
         )
@@ -226,8 +219,11 @@ class BirdNETOccurrenceModel:
     adapted from BirdNET-Analyzer occurrence meta-model on GitHub
 
     Args:
-        checkpoint_url: url to .tflite checkpoint on GitHub, or a local path to the .tflite file
-        label_url: url to .txt file with class labels, or a local path to the .txt file
+        version: BirdNET version to use for meta-model. 
+            Currently only 2.4 is supported for automatic download.
+            Can specify other veresion if providing paths to local checkpoint and label files
+        checkpoint_path: path to .tflite checkpoint file
+        label_path: path to .txt file with class labels
         num_tflite_threads: number of threads for TFLite interpreter
         cache_dir: directory to cache downloaded files (uses default cache if None)
 
@@ -245,15 +241,16 @@ class BirdNETOccurrenceModel:
 
     def __init__(
         self,
-        checkpoint_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_MData_Model_V2_FP16.tflite",
-        label_url="https://github.com/kahst/BirdNET-Analyzer/blob/v1.3.1/labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_af.txt",
+        version="2.4",
+        checkpoint_path=None,
+        label_path=None,
         num_tflite_threads=1,
         cache_dir=None,
     ):
         # only require tensorflow if/when this class is used
         try:
             import ai_edge_litert.interpreter as tflite
-
+            import huggingface_hub
             resolver = tflite.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES
         except ModuleNotFoundError as exc:
             try:
@@ -266,21 +263,17 @@ class BirdNETOccurrenceModel:
                     "Install in your python environment with `pip install tensorflow`"
                 ) from exc
 
-        self.version = "2.4"
+        self.version = str(version)
 
         # load class list:
-        if label_url.startswith("http"):
-            label_path = download_cached_file(
-                label_url,
-                filename=None,
-                model_name="birdnet",
-                model_version=self.version,
-                cache_dir=cache_dir,
+        if label_path is None:
+            label_path = huggingface_hub.hf_hub_download(
+                repo_id=BIRDNET_HF_HANDLES[self.version]["repo_id"],
+                filename=BIRDNET_HF_HANDLES[self.version]["labels"]
             )
-        else:
-            label_path = label_url
-        label_path = Path(label_path).resolve()  # get absolute path
-        assert label_path.exists(), f"Label path {label_path} does not exist"
+        else: # assert local path exists
+            label_path = Path(label_path).resolve()
+            assert label_path.exists(), f"Label path {label_path} does not exist"
 
         # labels.txt is a single column of class names without a header
         self.classes = pd.read_csv(label_path, header=None)[0].values
@@ -289,20 +282,15 @@ class BirdNETOccurrenceModel:
         self.common_names = [c.split("_")[1] for c in self.classes]
 
         # download model if URL, otherwise find it at local path:
-        if checkpoint_url.startswith("http"):
-            print("downloading model from URL...")
-            model_path = download_cached_file(
-                checkpoint_url,
-                filename=None,
-                model_name="birdnet",
-                model_version=self.version,
-                cache_dir=cache_dir,
+        if checkpoint_path is None:
+            model_path = huggingface_hub.hf_hub_download(
+                repo_id=BIRDNET_HF_HANDLES[self.version]["repo_id"],
+                filename=BIRDNET_HF_HANDLES[self.version]["tflite_FP16_metamodel"]
             )
         else:
-            model_path = checkpoint_url
+            model_path = Path(checkpoint_path).resolve()
+            assert model_path.exists(), f"Model path {model_path} does not exist"
 
-        model_path = str(Path(model_path).resolve())  # get absolute path as string
-        assert Path(model_path).exists(), f"Model path {model_path} does not exist"
 
         self.interpreter = tflite.Interpreter(
             model_path=model_path,
