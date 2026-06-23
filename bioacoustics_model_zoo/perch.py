@@ -150,6 +150,7 @@ class Perch(TensorFlowModelWithPytorchClassifier):
         self.tf_model = tf_model
         self.inference_dataloader_cls = AudioSampleArrayDataloader
         self.train_dataloader_cls = AudioSampleArrayDataloader
+        self._class_outputs_key = "label"
 
         # match the resampling method used by Perch / HopLite repo
         self.preprocessor.pipeline["load_audio"].params["resample_type"] = "polyphase"
@@ -171,7 +172,7 @@ class Perch(TensorFlowModelWithPytorchClassifier):
             )
             tf.config.optimizer.set_jit(False)
 
-    def batch_forward(self, batch_data, return_dict=False):
+    def batch_forward(self, batch_data):
         """run inference on a single batch of samples
 
         Returned logits depend on self.use_custom_classifier: if False, returns
@@ -180,18 +181,13 @@ class Perch(TensorFlowModelWithPytorchClassifier):
 
         Args:
             batch_samples: list of AudioSample objects
-            return_dict: bool, if True, returns a dictionary of all outputs
-                [default: False] return (embeddings, logits)
 
         Returns:
-            if return_dict=False: (embeddings, logits)
-            if return_dict=True:
             dictionary with keys ('order', 'embedding', 'family', 'frontend',
-            'genus', 'label')
+            'genus', 'label', )
 
             if use_custom_classifier=True:
-                if return_dict=False, logits are the output of self.network(batch_data)
-                if return_dict=True, dict has additional key 'custom_classifier'
+                dict has additional key 'custom_classifier'
                 with outputs of self.network
         """
         batch_data = np.array([s.data.samples for s in batch_data], dtype=np.float32)
@@ -207,86 +203,52 @@ class Perch(TensorFlowModelWithPytorchClassifier):
                 "frontend": None,
             }
 
-        # move tensorflow tensors to CPU and convert to numpy
-        outs = {k: None if v is None else v.numpy() for k, v in outs.items()}
-
         if self.use_custom_classifier:
-            # use custom classifier to generate logits
+            # use custom Pytorch classifier head to generate logits
             emb_tensor = torch.tensor(outs["embedding"]).to(self.device)
             self.network.to(self.device)
-            logits = self.network(emb_tensor).detach().cpu().numpy()
             # add additional key to output dictionary
-            outs["custom_classifier"] = logits
-        else:
-            logits = outs["label"]
-
-        if return_dict:
-            return outs
-        else:
-            return outs["embedding"], logits
+            outs["custom_classifier"] = self.network(emb_tensor).detach().cpu().numpy()
+        return outs
 
     def __call__(
-        self, dataloader, wandb_session=None, progress_bar=True, return_value="logits"
+        self, dataloader, wandb_session=None, progress_bar=True, targets=None,
     ):
-        """run forward pass of model, iterating through dataloader batches
-
-        The output can take several forms since it depends both on `return_value` and
-        on self.use_custom_classifier. See details below.
+        """run forward pass of model, iterating through dataloader batches, returning dict of aggregated outputs
 
         Args:
             dataloader: instance of SafeAudioDataloader or custom subclass
             wandb_session: wandb.Session object, if provided, logs progress
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
-            return_value: str, 'logits', 'embeddings', 'taxonomic', or 'all' [default: 'logits']
-                - 'logits': returns only the logits on the species classes
-                - 'embeddings': returns only the feature vectors from the penultimate layer
-                - 'taxonomic': returns dictionionary with logits on all taxonomic levels
-                    (keys: 'order', 'family', 'genus', 'label')
-                - 'all': returns dictionary with all Perch outputs
-                    (keys: 'order', 'family', 'genus', 'label', 'embedding', 'frontend')
-                    - 'label' is the logits on the species classes
-                    - 'embedding' is the feature vectors from the penultimate layer
-                    - 'frontend' is the log mel spectrogram generated at the input layer
-                Note: for version < 8, 'order', 'family', 'genus', and 'frontend' will be None
-                Note: if self.custom_classifier=True:
-                - for return_value='logits', returns logits from self.network
-                - for return_value='all', returns dictionary with additional key
-                'custom_classifier' with logits from self.network
+            targets: tuple of strings, specifying which outputs to return. 
+                Default is 'label' if self.use_custom_classifier=False, or 'custom_classifier' if self.use_custom_classifier=True
+                Options:
+                - 'label': logits for species classes (default)
+                - 'embedding': feature vector from penultimate layer
+                - 'order': logits for order classes (only for version >= 8)
+                - 'family': logits for family classes (only for version >= 8)
+                - 'genus': logits for genus classes (only for version >= 8)
+                - 'frontend': log mel spectrograms generated at the input layer (only for version >= 8)
+                - 'custom_classifier': logits from the custom classifier head
+                Note:  'order', 'family', 'genus', and 'frontend' are only available from verion >= 8
 
-        Returns: depends on return_value argument (see above)
+        Returns: dictionary with keys specified in `targets`, each containing a numpy array of outputs for all samples in the dataloader
 
         """
-        # check return_value argument is valid
-        err = f"return_value must be one of 'logits', 'embeddings', 'taxonomic', or 'all', got {return_value}"
-        assert return_value in ("logits", "embeddings", "taxonomic", "all"), err
-
+        import tensorflow as tf
+        if targets is None:
+            targets = ("custom_classifier",) if self.use_custom_classifier else ("label",)
         # iterate batches, running inference on each
-        logits = []
-        embeddings = []
-        order_logits = []
-        family_logits = []
-        genus_logits = []
-        logmelspec = []
-        custom_classifier_logits = []
+        results = {key: [] for key in targets}
         for i, batch_samples in enumerate(tqdm(dataloader, disable=not progress_bar)):
-            # _batch_forward returns dict with tf model outputs + custom classifier
+            # batch_forward returns dict with tf model outputs + custom classifier
             # logits if self.use_custom_classifier=True
-            outs = self.batch_forward(batch_samples, return_dict=True)
+            outs = self.batch_forward(batch_samples)
 
             # only aggregate the outputs requested to save memory
-            if return_value != "embeddings":
-                logits.extend(outs["label"].tolist())
-                if self.use_custom_classifier:
-                    custom_classifier_logits.extend(outs["custom_classifier"].tolist())
-            if return_value != "logits":
-                embeddings.extend(outs["embedding"].tolist())
-            if return_value in ("taxonomic", "all"):
-                order_logits.extend(outs["order"].tolist())
-                family_logits.extend(outs["family"].tolist())
-                genus_logits.extend(outs["genus"].tolist())
-            if return_value == "all":
-                logmelspec.extend(outs["frontend"].tolist())
-
+            for key in targets:
+                results[key].append(outs[key])
+            
             if wandb_session is not None:
                 wandb_session.log(
                     {
@@ -295,37 +257,11 @@ class Perch(TensorFlowModelWithPytorchClassifier):
                         "total_batches": len(dataloader),
                     }
                 )
-        if return_value == "taxonomic":
-            return {
-                "order": np.array(order_logits) if self.version >= 8 else None,
-                "family": np.array(family_logits) if self.version >= 8 else None,
-                "genus": np.array(genus_logits) if self.version >= 8 else None,
-                "label": np.array(logits),
-            }
-        elif return_value == "all":
-            return {
-                "order": np.array(order_logits) if self.version >= 8 else None,
-                "family": np.array(family_logits) if self.version >= 8 else None,
-                "genus": np.array(genus_logits) if self.version >= 8 else None,
-                "label": np.array(logits),
-                "embedding": np.array(embeddings),
-                "frontend": np.array(logmelspec) if self.version >= 8 else None,
-                "custom_classifier": (
-                    np.array(custom_classifier_logits)
-                    if self.use_custom_classifier
-                    else None
-                ),
-            }
-        elif return_value == "embeddings":
-            return np.array(embeddings)
-        elif return_value == "logits":
-            return (
-                np.array(custom_classifier_logits)
-                if self.use_custom_classifier
-                else np.array(logits)
-            )
+        # concatenate results for each key into a single array
+        results = { key: tf.concat(value, axis=0).numpy() for key, value in results.items()}
+        return results
 
-    def forward(self, samples, progress_bar=True, wandb_session=None):
+    def forward(self, samples, progress_bar=True, wandb_session=None, targets = ('label', 'embedding', 'order','family', 'genus', 'frontend'), **dataloader_kwargs):
         """
         Run inference on a list of samples, returning all outputs as a dictionary
 
@@ -333,68 +269,34 @@ class Perch(TensorFlowModelWithPytorchClassifier):
             samples: list of file paths, OR pd.DataFrame with index containing audio file paths
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
             wandb_session: wandb.Session object, if provided, logs progress
+            targets: tuple of strings, specifying which outputs to return
+                any of: 'label', 'embedding', 'order', 'family', 'genus', 'frontend', 'custom_classifier'
+            **dataloader_kwargs: additional keyword arguments passed to self.predict_dataloader()
 
-        Returns: dictionary with keys ('order', 'embedding', 'family', 'frontend', 'genus', 'label'):
-            - order, family, genus, and label (species) are dataframes of logits at different taxonomic levels
-            - embedding is a dataframe with the feature vector from the penultimate layer
-            - frontend is np.array of log mel spectrograms generated at the input layer
-            - if self.use_custom_classifier, includes additional key 'custom_classifier'
-                with a dataframe containing the outputs of self.network(embeddings)
+        Returns: dictionary with keys specified in `targets`, each containing a numpy array of outputs for all samples in the dataloader
+
         """
         # create dataloader to generate batches of AudioSamples
-        dataloader = self.predict_dataloader(samples)
+        dataloader = self.predict_dataloader(samples, **dataloader_kwargs)
 
         # run inference, getting all outputs
         outs = self(
             dataloader=dataloader,
             wandb_session=wandb_session,
             progress_bar=progress_bar,
-            return_value="all",
+            targets=targets
         )
 
         # put logit & embedding outputs in DataFrames with multi-index like .predict()
-        outs["order"] = (
-            pd.DataFrame(
-                data=outs["order"],
-                index=dataloader.dataset.dataset.label_df.index,
-                columns=self.taxonomic_classes["order"],
-            )
-            if self.version >= 8
-            else None
-        )
-        outs["family"] = (
-            pd.DataFrame(
-                data=outs["family"],
-                index=dataloader.dataset.dataset.label_df.index,
-                columns=self.taxonomic_classes["family"],
-            )
-            if self.version >= 8
-            else None
-        )
-        outs["genus"] = (
-            pd.DataFrame(
-                data=outs["genus"],
-                index=dataloader.dataset.dataset.label_df.index,
-                columns=self.taxonomic_classes["genus"],
-            )
-            if self.version >= 8
-            else None
-        )
-        outs["label"] = pd.DataFrame(
-            data=outs["label"],
-            index=dataloader.dataset.dataset.label_df.index,
-            columns=self.taxonomic_classes["species"],
-        )
-        outs["embedding"] = pd.DataFrame(
-            data=outs["embedding"],
-            index=dataloader.dataset.dataset.label_df.index,
-        )
-        if self.use_custom_classifier:
-            outs["custom_classifier"] = pd.DataFrame(
-                data=outs["custom_classifier"],
-                index=dataloader.dataset.dataset.label_df.index,
-                columns=self.classes,
-            )
+        for k in ["order", "family", "genus", "label", "embedding", "custom_classifier"]:
+            if k in outs:
+                if outs[k] is not None:
+                    outs[k] = pd.DataFrame(
+                        data=outs[k],
+                        index=dataloader.dataset.dataset.label_df.index,
+                        columns=self.taxonomic_classes.get(k, None),
+                    )
+
 
         return outs
 
@@ -432,23 +334,13 @@ class Perch(TensorFlowModelWithPytorchClassifier):
         dataloader = self.predict_dataloader(samples, **kwargs)
 
         # run inference, getting embeddings and optionally logits
-        if return_preds:
-            # get all outputs, then extract embeddings and logits
-            outs = self(
-                dataloader=dataloader,
-                progress_bar=progress_bar,
-                return_value="all",
-            )
-            embeddings = outs["embedding"]
-            preds = outs["label"]
-        else:
-            # save memory by only aggergating the embeddigs
-            embeddings = self(
-                dataloader=dataloader,
-                progress_bar=progress_bar,
-                return_value="embeddings",
-            )
-
+        outs = self(
+            dataloader=dataloader,
+            progress_bar=progress_bar,
+            targets=("embedding", "label") if return_preds else ("embedding",)
+        )
+        embeddings = outs["embedding"]
+       
         if return_dfs:
             # put embeddings in DataFrame with multi-index like .predict()
             embeddings = pd.DataFrame(
@@ -456,6 +348,7 @@ class Perch(TensorFlowModelWithPytorchClassifier):
             )
 
         if return_preds:
+            preds = outs["label"]
             if return_dfs:
                 # put predictions in a DataFrame with same index as embeddings
                 preds = pd.DataFrame(
