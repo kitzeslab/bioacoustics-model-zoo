@@ -15,17 +15,17 @@ PERCH2_ONNX_HF_HANDLES = {
     },
 }
 class Perch2ONNX(ONNXModel):
-    def __init__(self,remove_classifier=False,no_dft=True):
+    def __init__(self,headless=False,no_dft=True):
         """Initialize Perch V2 ONNX model, downloading checkpoint from HuggingFace
         
         Args:
-            remove_classifier (bool): If True, load the model without the classifier head
+            headless (bool): If True, load the model without the classifier head
                 for efficient embedding workflows.
             no_dft (bool): If True, load the model with DFT operation flattened for
                 enhanced compatibility with ONNX runtimes that do not support DFT
                 operations. False is the default as it appears to be slightly more efficient.
         """
-        key = "without_classifier" if remove_classifier else "with_classifier"
+        key = "without_classifier" if headless else "with_classifier"
         checkpoint_key = "no_dft_checkpoint" if no_dft else "checkpoint"
         model_path = PERCH2_ONNX_HF_HANDLES[key][checkpoint_key]
         # download or get local cached path to model from HuggingFace Hub
@@ -34,7 +34,7 @@ class Perch2ONNX(ONNXModel):
             filename=model_path,
         )
         # load class list
-        if remove_classifier:
+        if headless:
             classes = []
         else:
             labels_path = huggingface_hub.hf_hub_download(
