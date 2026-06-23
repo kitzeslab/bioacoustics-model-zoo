@@ -8,6 +8,7 @@ import pandas as pd
 import opensoundscape
 from opensoundscape.preprocess.preprocessors import AudioPreprocessor
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
+import tensorflow
 from tqdm.autonotebook import tqdm
 from opensoundscape import Audio, Action
 
@@ -41,7 +42,7 @@ class YAMNetDataloader(SafeAudioDataloader):
 
 @register_bmz_model
 class YAMNet(TensorFlowModelWithPytorchClassifier):
-    def __init__(self, url="https://tfhub.dev/google/yamnet/1", input_duration=60):
+    def __init__(self, handle='google/yamnet/TensorFlow2/yamnet/1', input_duration=60):
         """load YAMNet Audio CNN from tensorflow hub
 
         Args:
@@ -75,7 +76,7 @@ class YAMNet(TensorFlowModelWithPytorchClassifier):
         # only require tensorflow and tensorflow_hub if/when this class is used
         try:
             import tensorflow as tf
-            import tensorflow_hub
+            import kagglehub
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
                 "YAMNet requires tensorflow and tensorflow_hub packages to be installed. "
@@ -83,10 +84,11 @@ class YAMNet(TensorFlowModelWithPytorchClassifier):
             ) from exc
 
         # Load the model.
-        self.tf_model = tensorflow_hub.load(url)
-
+        model_path = kagglehub.model_download(handle)
+        tf_model = tf.saved_model.load(model_path)
+       
         # load class list (based on example from https://tfhub.dev/google/yamnet/1)
-        class_map_path = self.tf_model.class_map_path().numpy()
+        class_map_path = tf_model.class_map_path().numpy()
         class_names = class_names_from_csv(
             tf.io.read_file(class_map_path).numpy().decode("utf-8")
         )
@@ -97,6 +99,8 @@ class YAMNet(TensorFlowModelWithPytorchClassifier):
             sample_duration=input_duration,
             sample_rate=16000,
         )
+        
+        self.tf_model = tf_model
 
         self.sample_duration = self.input_duration = input_duration
         # the dataloader returns a list of AudioSample objects, with .data as audio waveform samples
@@ -149,7 +153,7 @@ class YAMNet(TensorFlowModelWithPytorchClassifier):
             # 1d input is batched into windows/frames internally by YAMNet
             sample_array = batch[0].data.samples
             # discard logmelspec return value to avoid large memory usage
-            batch_logits, batch_embeddings, batch_specs = self.network(sample_array)
+            batch_logits, batch_embeddings, batch_specs = self.tf_model(sample_array)
             logits.extend(batch_logits.numpy().tolist())
             embeddings.extend(batch_embeddings.numpy().tolist())
             logmelspecs.extend(batch_specs.numpy().tolist())
@@ -219,6 +223,7 @@ class YAMNet(TensorFlowModelWithPytorchClassifier):
                 names=["file", "start_time", "end_time"],
             ),
             data=preds,
+            columns=self.classes
         )
 
         return preds
