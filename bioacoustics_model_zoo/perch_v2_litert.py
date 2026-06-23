@@ -73,11 +73,12 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
         opensoundscape.ml.cnn.SpectrogramClassifier.similarity_search_hoplite_db
     )
 
-    def __init__(self, model_path, version=None, num_tflite_threads=1):
+    def __init__(self, num_tflite_threads=1):
         # only require litert
         try:
             from ai_edge_litert import interpreter
             from ai_edge_litert.interpreter import Interpreter
+            import huggingface_hub
 
             # resolver = tflite.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES
         except ModuleNotFoundError as exc:
@@ -96,29 +97,24 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
             sample_rate=32000,
         )
 
-        # which model to load depends on whether GPU is available
-        model_path = str(Path(model_path).resolve())  # get absolute path as string
-        assert Path(model_path).exists(), f"Model path {model_path} does not exist"
+        # download the model from HuggingFace or load from cache
+        model_path = huggingface_hub.hf_hub_download(repo_id="justinchuby/Perch-onnx", filename="perch_v2.tflite")
 
         self.tf_model = Interpreter(
             model_path=model_path,
             num_threads=num_tflite_threads,
-            # experimental_op_resolver_type=resolver,
         )
         self.tf_model.allocate_tensors()
 
         input_details = self.tf_model.get_input_details()
         signature_list = self.tf_model.get_signature_list()
 
-        # input_shape = input_details[0]["shape"]
         self.tf_input_dtype = input_details[0]["dtype"]
-
         self.tf_inference_handle = self.tf_model.get_signature_runner("serving_default")
         self.tf_in_layer = signature_list["serving_default"]["inputs"][0]
-        input_shape = input_details[0]["shape"]
-        input_dtype = input_details[0]["dtype"]
+        # input_shape = input_details[0]["shape"]
 
-        self.version = version
+        self.version = "2025-11-05"
         # self.ebird_codes = class_lists["perch_v2_ebird_classes"]["classes"]
         self.inference_dataloader_cls = AudioSampleArrayDataloader
         self.train_dataloader_cls = AudioSampleArrayDataloader

@@ -87,7 +87,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
     Perch2 requires tensorflow >=2.20.0
     ```
-    pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow tensorflow-hub
+    pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow kagglehub
     ```
     """
 
@@ -122,28 +122,31 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             raise ModuleNotFoundError(
                 """Perch2 requires tensorflow and tensorflow_hub packages >=2.20.0.
                 Please install them using:
-                pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow tensorflow-hub
+                pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow kagglehub
                 """
             ) from exc
 
         # which model to load depends on whether GPU is available
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
-        if device in {"cuda", "xla"} :
+        self.device = device
+        if device in {"cuda", "xla"} : # Load GPU-only model (No MPS support as of June 2026)
             if version is None:
-                version = 2  # latest GPU-compatible as of Oct 2025
-            tested_versions = (2,)  # as of Jan 2026
+                version = 2  # latest GPU-compatible as of June 2026
+            tested_versions = (2,)  # as of June 2026
 
             handle = (
                 f"google/bird-vocalization-classifier/tensorFlow2/perch_v2/{version}"
             )
-        else:
+            self.tf_device = tf.device("GPU")
+        else: # CPU-only model
             if version is None:
-                version = 1  # latest CPU-compatible as of Oct 2025
-            tested_versions = (1,)  # as of Jan 2026
+                version = 1  # latest CPU-compatible as of June 2026
+            tested_versions = (1,)  # as of June 2026
             handle = f"google/bird-vocalization-classifier/tensorFlow2/perch_v2_cpu/{version}"
-
-        self.device = device
+            self.tf_device = tf.device("CPU")
+            
+        # store Perch2 version number as attribute
         self.version = version
         if not version in tested_versions:
             warnings.warn(
@@ -152,7 +155,6 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
         # tensorflow tends to choose the device automatically, so to manually select between CPU and GPU we need to use the tf.device
         # context manager both when the model is loaded and when the model forward call is made
-        self.tf_device = tf.device("CPU" if self.device.type == "cpu" else "GPU")
         with self.tf_device:
             try:
                 model_path = kagglehub.model_download(handle)
