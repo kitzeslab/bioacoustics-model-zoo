@@ -2,7 +2,7 @@
 Pre-trained models for bioacoustic classification tasks
 
 Suggested Citation
-> Lapp, S., and Kitzes, J., 2025. "Bioacoustics Model Zoo version 0.13.0". https://github.com/kitzeslab/bioacoustics-model-zoo
+> Lapp, S., and Kitzes, J., 2025. "Bioacoustics Model Zoo version 0.13.1". https://github.com/kitzeslab/bioacoustics-model-zoo
 
 
 ## Set up / Installation
@@ -128,6 +128,8 @@ Perch2 requires tensorflow >=2.20.0. For instance, update to the latest versions
 ```
 pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow kagglehub
 ```
+
+We also provide TFLite (bmz.Perch2LiteRT) and ONNX (bmz.Perch2ONNX) alternatives to the TensorFlow version of the Perch V2 model. These may be well suited for scenarios where installing TensorFlow is undesirable. The ONNX version can be loaded without the classification head using the headless=True argument for a much smaller and more efficient embedding-only model.
 
 Example: 
 
@@ -429,28 +431,6 @@ OpenSoundscape the module is named `signal` rather than `signal_processing`)
 
 - [Python notebooks demonstrating use](https://github.com/kitzeslab/ruffed_grouse_manuscript_2022)
 - [Manuscript: Lapp et al 2022](https://wildlife.onlinelibrary.wiley.com/doi/full/10.1002/wsb.1395)
-
-
-# Converting BMZ models to Pytorch Lightning + Opensoundscape
-Opensoundscape 0.13.0 will make this easier by implementing LightningSpectrogramModule.from_model(model)
-
-```python
-import opensoundscape as opso # v0.12.0
-import bioacoustics_model_zoo as bmz
-from opensoundscape.ml.lightning import LightningSpectrogramModule
-
-# Load any Pytorch-based model from the model zoo (not TensorFlow models like Perch/BirdNET)
-model = bmz.BirdSetConvNeXT()
-
-#convert to Lightning model object with .predict_with_trainer, .fit_with_trainer methods
-# 
-lm = LightningSpectrogramModule(
-    architecture=model.network, classes=model.classes, sample_duration=model.preprocessor.sample_duration
-)
-lm.preprocessor = model.preprocessor
-# lm.predict_with_trainer(opso.birds_path)
-# lm.fit_with_trainer(...)
-```
 
 # Contributing
 
