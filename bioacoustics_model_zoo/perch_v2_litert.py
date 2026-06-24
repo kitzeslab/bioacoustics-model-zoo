@@ -143,8 +143,8 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
         Args:
             batch_data: np.array of audio samples, shape (batch_size, 32000*5)
             targets: tuple of str, select from
-                ['embedding', 'spatial_embedding', 'label', 'spectrogram','custom_classifier_logits']
-                - 'custom_classifier_logits' is the result of self.network() on the embeddings
+                ['embedding', 'spatial_embedding', 'label', 'spectrogram','custom_classifier']
+                - 'custom_classifier' is the result of self.network() on the embeddings
             avgpool: ignored
         Returns:
             dict with keys matching targets, values are np.arrays of outputs
@@ -163,21 +163,21 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
         if -1 in targets:
             model_outputs[-1] = model_outputs["label"]
 
+        if "custom_classifier" in targets:
+            emb_tensor = torch.tensor(model_outputs["embedding"]).to(self.device)
+            self.network.to(self.device)
+            model_outputs["custom_classifier"] = (
+                self.network(emb_tensor).detach().cpu().numpy()
+            )
+
         # subset results to only requested targets
-        outs = {
+        model_outputs = {
             k: None if v is None else v
             for k, v in model_outputs.items()
             if k in targets
         }
 
-        if "custom_classifier_logits" in targets:
-            emb_tensor = torch.tensor(outs["embedding"]).to(self.device)
-            self.network.to(self.device)
-            outs["custom_classifier_logits"] = (
-                self.network(emb_tensor).detach().cpu().numpy()
-            )
-
-        return outs
+        return model_outputs
 
     def forward(
         self,
@@ -191,7 +191,7 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
         """
         Run inference on a list of samples, returning all selected outputs as a dictionary
 
-        use "custom_classifier_logits" in return_values to get outputs from the
+        use "custom_classifier" in return_values to get outputs from the
         custom classifier head (self.network)
 
         wraps self.predict_dataloader() and self.__call__() to run the model on
@@ -202,14 +202,14 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
             wandb_session: wandb.Session object, if provided, logs progress
             return_values: tuple(str,): select from 'label', 'embedding',
-                'spatial_embedding', 'spectrogram', 'custom_classifier_logits'
+                'spatial_embedding', 'spectrogram', 'custom_classifier'
                 [default: ('label','embedding','spatial_embedding','spectrogram')]
                 Include any combination of the following:
                 - 'label': logit scores (class predictions) on the species classes
                 - 'embedding': 1D feature vectors from the penultimate layer of the network
                 - 'spatial_embedding': un-pooled spatial embeddings from the network
                 - 'spectrogram': log-mel spectrograms generated during preprocessing
-                - 'custom_classifier_logits': outputs of the custom classifier head (self.network)
+                - 'custom_classifier': outputs of the custom classifier head (self.network)
             return_dfs: bool, if True, returns outputs as pd.DataFrame with multi-index like
                 .predict() ('file','start_time','end_time'), if False, returns np.array
                 [default: True]
@@ -223,7 +223,7 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
                 shape: (num_clips, 1536)
             - 'spatial_embedding': np.array of per-clip spatial embeddings
                 shape: (num_clips, 5, 3, 1536)
-            - 'custom_classifier_logits': pd.DataFrame or np.array of per-clip logits from the
+            - 'custom_classifier': pd.DataFrame or np.array of per-clip logits from the
                 custom classifier head, shape: (num_clips, num_custom_classes)
         """
         # create dataloader to generate batches of AudioSamples
@@ -253,9 +253,9 @@ class Perch2LiteRT(TensorFlowModelWithPytorchClassifier):
                     index=dataloader.dataset.dataset.label_df.index,
                     columns=None,
                 )
-            if "custom_classifier_logits" in results_dict:
-                results_dict["custom_classifier_logits"] = pd.DataFrame(
-                    data=results_dict["custom_classifier_logits"],
+            if "custom_classifier" in results_dict:
+                results_dict["custom_classifier"] = pd.DataFrame(
+                    data=results_dict["custom_classifier"],
                     index=dataloader.dataset.dataset.label_df.index,
                     columns=self._custom_classes,
                 )

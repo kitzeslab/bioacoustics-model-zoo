@@ -162,7 +162,7 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
             batch_samples: list of AudioSample objects
             targets: tuple of str, which outputs to return:
                 - use -1 to get logits from BirdNET final layer
-                - use "custom_classifier_logits" to get logits from custom classifier head (self.network)
+                - use "custom_classifier" to get logits from custom classifier head (self.network)
             avgpool: not implemented (BirdNET embeddings are already pooled)
 
         Returns: dictionary of outputs for each key in targets
@@ -193,17 +193,15 @@ class BirdNET(TensorFlowModelWithPytorchClassifier):
 
         batch_embeddings = self.tf_model.get_tensor(embedding_idx)
         if "embedding" in targets:
-            if "embedding" in targets:
-                outs["embedding"] = batch_embeddings
-        if -1 in targets:  # add class logit score predictions
-            if self.use_custom_classifier:
-                # run self.network on the features from birdnet to predict using self.network
-                tensors = torch.tensor(batch_embeddings).to(self.device)
-                self.network.to(self.device)
-                outs[-1] = self.network(tensors).detach().cpu().numpy()
-            else:
-                outs[-1] = self.tf_model.get_tensor(output_details["index"])
-
+            outs["embedding"] = batch_embeddings
+        if self._class_outputs_key in targets:  # add class logit score predictions (-1 key by default)
+            outs[self._class_outputs_key] = self.tf_model.get_tensor(output_details["index"])
+        if "custom_classifier" in targets:
+            # run self.network on the features from birdnet to predict using self.network
+            tensors = torch.tensor(batch_embeddings).to(self.device)
+            self.network.to(self.device)
+            outs["custom_classifier"] = self.network(tensors).detach().cpu().numpy()
+                
         return outs
 
     def _check_or_get_default_embedding_layer(self, target_layer=None):
