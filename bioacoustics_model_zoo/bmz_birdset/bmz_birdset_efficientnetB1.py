@@ -108,3 +108,4 @@ class BirdSetEfficientNetB1(SpectrogramClassifier):
         self.network.classifier_layer = "classifier"
         self.network.embedding_layer = "efficientnet.pooler"
         self.network.cam_layer = "efficientnet.encoder.blocks.1"
+        self.embedding_size = self.network.classifier.in_features

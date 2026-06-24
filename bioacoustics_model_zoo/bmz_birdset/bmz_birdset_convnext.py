@@ -115,3 +115,4 @@ class BirdSetConvNeXT(SpectrogramClassifier):
         self.network.classifier_layer = "classifier"
         self.network.embedding_layer = "convnext.layernorm"
         self.network.cam_layer = "convnext.encoder.stages.2.layers.26"
+        self.embedding_size = self.network.classifier.in_features

@@ -1,6 +1,8 @@
-from opensoundscape import ONNXModel
 import huggingface_hub
 import pandas as pd
+from opensoundscape import ONNXModel
+from opensoundscape.preprocess.actions import Action
+from opensoundscape import Audio
 
 PERCH2_ONNX_HF_HANDLES = {
     "with_classifier": {
@@ -46,8 +48,9 @@ class Perch2ONNX(ONNXModel):
         super().__init__(onnx_model_path=model_path, sample_rate=32000, sample_duration=5.0, classes=classes, class_outputs_key="label")
         self.add_channel_dim=False
         self.embedding_outputs_key = 'embedding'
-        from opensoundscape.preprocess.actions import Action
-        from opensoundscape import Audio
+        self.embedding_size = 1536
+        
+        # specify preprocessing
         normalize_action = Action(Audio.normalize, peak_level=0.25)
         self.preprocessor.insert_action('normalize', normalize_action)
 
