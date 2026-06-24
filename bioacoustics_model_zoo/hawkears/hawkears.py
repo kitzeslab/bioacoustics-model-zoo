@@ -184,9 +184,10 @@ class HawkEars(CNN):
     ensembled model outputs.
 
     Note that embed() currently uses embeddings from self.network.model_4, the
-    largest of the ensembled inference models. By contrast, in the HawkEars
-    GitHub repo, embedding currently uses instead an entirely different model
-    with an efficientnet architecture, so results will differ from here.
+    largest of the ensembled inference models. We separately provide the 
+    HawkEars_Embedding model, which is a different architecture that according
+    to the package maintainer is preferred for embedding and similarity search
+    tasks.
 
     Args:
         config: use None for default, or pass a valid object created with the
