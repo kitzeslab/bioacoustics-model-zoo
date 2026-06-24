@@ -1,6 +1,10 @@
+import torch
 from transformers import ConvNextForImageClassification
 from opensoundscape import SpectrogramClassifier
+from opensoundscape.ml.cnn import register_model_cls
 from opensoundscape.preprocess.preprocessors import register_preprocessor_cls
+from opensoundscape.preprocess.preprocessors import preprocessor_from_dict
+
 from bioacoustics_model_zoo.bmz_birdset.birdset_preprocessing import BirdsetPreprocessor
 from bioacoustics_model_zoo.utils import register_bmz_model
 from bioacoustics_model_zoo.cache import get_model_cache_dir
@@ -36,6 +40,7 @@ class ConvNextForImageClassificationLogits(ConvNextForImageClassification):
 
 
 @register_bmz_model
+@register_model_cls
 class BirdSetConvNeXT(SpectrogramClassifier):
     """BirdSet ConvNeXT global bird species foundation model
 
@@ -116,3 +121,19 @@ class BirdSetConvNeXT(SpectrogramClassifier):
         self.network.embedding_layer = "convnext.layernorm"
         self.network.cam_layer = "convnext.encoder.stages.2.layers.26"
         self.embedding_size = self.network.classifier.in_features
+
+    @classmethod
+    def load(cls, path, device=None):
+        """load model from a local file path
+
+        Args:
+            path (str): local file path
+            device (torch.device, optional): device to load model on
+        """
+        trained_model_content = torch.load(path, map_location=device,weights_only=False)
+        m=cls()
+        m.change_classes(trained_model_content['classes'])
+        m.network.load_state_dict(trained_model_content['weights']) 
+        # re-apply any custom preprocessing
+        m.preprocessor = preprocessor_from_dict(trained_model_content['preprocessor_dict'])
+        return m

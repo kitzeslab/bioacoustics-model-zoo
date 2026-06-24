@@ -128,7 +128,7 @@ class BirdsetPreprocessor(BasePreprocessor):
 
         self.pipeline = pd.Series(
             {
-                "load_audio": AudioClipLoader(sample_rate=None),
+                "load_audio": AudioClipLoader(),
                 # if we are augmenting and get a long file, take a random trim from it
                 "random_trim_audio": AudioTrim(
                     target_duration=sample_duration,
