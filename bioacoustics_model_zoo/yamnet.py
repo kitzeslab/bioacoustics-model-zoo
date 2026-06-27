@@ -73,14 +73,14 @@ class YAMNet(TensorFlowModelWithPytorchClassifier):
         persist across system restart), but this can be configured
         (see https://www.tensorflow.org/hub/caching#caching_of_compressed_downloads)
         """
-        # only require tensorflow and tensorflow_hub if/when this class is used
+        # only require tensorflow and kagglehub if/when this class is used
         try:
             import tensorflow as tf
             import kagglehub
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
-                "YAMNet requires tensorflow and tensorflow_hub packages to be installed. "
-                "Install in your python environment with `pip install tensorflow tensorflow_hub`"
+                "YAMNet requires tensorflow and kagglehub packages to be installed. "
+                "Install in your python environment with `pip install tensorflow kagglehub`"
             ) from exc
 
         # Load the model.

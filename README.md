@@ -347,7 +347,7 @@ This particular model was trained on bird vocalization data.
 
 Additional required packages:
 
-`tensorflow`, `tensorflow_hub`
+`tensorflow`, `kagglehub`
 
 Example:
 
@@ -382,7 +382,7 @@ Embedding model trained on AudioSet YouTube
 
 Additional required packages:
 
-`tensorflow`, `tensorflow_hub`
+`tensorflow`, `kagglehub`
 
 Example:
 
@@ -454,7 +454,7 @@ Check out any of the existing models for examples of how to complete these steps
 
 ### TensorFlow Installation in Python Environment
 
-Some models in the model zoo require tensorflow (and potentially tensorflow_hub) to be installed in your python environment. 
+Some models in the model zoo require tensorflow to be installed in your python environment. 
 
 Installing TensorFlow can be tricky, and it may not be possible to have cuda-enabled tensorflow in the same environment as cuda-enabled pytorch. In this case, you can install a cpu-only version of tensorflow (`pip install tensorflow-cpu`). You may want to start with a fresh environment, or uninstall tensorflow and nvidia-cudnn-cu11 then reinstall pytorch with the appropriate nvidia-cudnn-cu11, to avoid having the wrong cudnn for PyTorch. 
 

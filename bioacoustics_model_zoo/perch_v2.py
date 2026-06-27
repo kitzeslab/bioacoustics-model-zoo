@@ -1,6 +1,4 @@
 from sys import platform
-
-import kagglehub
 import tensorflow
 
 from bioacoustics_model_zoo.utils import register_bmz_model
@@ -114,13 +112,13 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 - 'cuda': forces GPU usage
 
         """
-        # only require tensorflow and tensorflow_hub if/when this class is used
+        # only require tensorflow and kagglehub if/when this class is used
         try:
-            import tensorflow_hub as hub
             import tensorflow as tf
+            import kagglehub
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
-                """Perch2 requires tensorflow and tensorflow_hub packages >=2.20.0.
+                """Perch2 requires tensorflow and kagglehub packages >=2.20.0.
                 Please install them using:
                 pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow kagglehub
                 """

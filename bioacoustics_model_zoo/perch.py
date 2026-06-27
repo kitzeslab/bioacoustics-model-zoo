@@ -1,9 +1,6 @@
 from pathlib import Path
-
-import kagglehub
 import pandas as pd
 import numpy as np
-import urllib
 import tensorflow
 import torch
 import warnings
@@ -86,15 +83,15 @@ class Perch(TensorFlowModelWithPytorchClassifier):
 
     def __init__(self, version=8, path=None):
 
-        # only require tensorflow and tensorflow_hub if/when this class is used
+        # only require tensorflow and kagglehub if/when this class is used
         try:
             import tensorflow as tf
-            import tensorflow_hub
+            import kagglehub
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
                 "GoogleBirdVocalizationClassifier requires tensorflow and "
-                "tensorflow_hub packages to be installed. "
-                "Install in your python environment with `pip install tensorflow tensorflow_hub`"
+                "kagglehub packages to be installed. "
+                "Install in your python environment with `pip install tensorflow kagglehub`"
             ) from exc
 
         self.version = version
