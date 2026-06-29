@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bioacoustics-model-zoo"
-version = "0.13.1"
+version = "0.13.2"
 description = "Public repository of machine learning models for bioacoustics, with OpenSoundscape integration"
 authors = ["sammlapp <sammlapp@gmail.com>"]
 readme = "README.md"
@@ -28,7 +28,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = ">=3.10, <3.14"
-opensoundscape = "~=0.13.1"
+opensoundscape = "~=0.13.2"
 PyGithub = ">=2.6.1"
 huggingface-hub = ">=0.33.4"
 
