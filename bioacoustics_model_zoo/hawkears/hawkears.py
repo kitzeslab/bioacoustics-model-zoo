@@ -1,8 +1,10 @@
 import warnings
 import pandas as pd
-import cv2
 import numpy as np
-
+try:
+    import cv2
+except Exception as e:
+    cv2 = None
 from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
 from opensoundscape.preprocess.actions import Action, BaseAction
 import opensoundscape
@@ -230,8 +232,9 @@ class HawkEars(CNN):
     ):
         try:
             import timm
+            import cv2
         except Exception as e:
-            raise Exception("install the timm package to use HawkEars") from e
+            raise Exception("install the timm and opencv-python packages to use HawkEars (pip install timm opencv-python)") from e
 
         self.is_lowband_model = load_lowband_model
         self.is_embedding_model = load_embedding_model
