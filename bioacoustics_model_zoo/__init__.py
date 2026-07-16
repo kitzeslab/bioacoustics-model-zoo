@@ -193,3 +193,4 @@ else:
 from bioacoustics_model_zoo import rana_sierrae_cnn
 from bioacoustics_model_zoo.rana_sierrae_cnn import RanaSierraeCNN
 from bioacoustics_model_zoo.perch_v2_onnx import Perch2ONNX
+from bioacoustics_model_zoo.birdnet_geomodel import BirdNETGeomodel
