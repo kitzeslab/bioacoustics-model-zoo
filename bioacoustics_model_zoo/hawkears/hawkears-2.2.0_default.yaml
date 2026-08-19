@@ -1,0 +1,20 @@
+audio:
+  spec_duration: 3.0
+  spec_height: 192
+  spec_width: 384
+  min_freq: 200
+  max_freq: 13000
+  win_length: .058
+  sampling_rate: 28000
+  choose_channel: true
+  use_spec_cache: true
+infer:
+  min_score: 0.7
+  audio_power: 0.7
+  segment_len: null
+  label_field: "codes"
+  scaling_coefficient: 1.0
+  scaling_intercept: 1.3
+# hawkears:
+#   heuristics_manager: "hawkears.heuristics.canada.main.CanadaHeuristicsManager"
+#   save_rarities: true

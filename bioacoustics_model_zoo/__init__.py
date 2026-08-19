@@ -29,6 +29,12 @@ except:
     ai_edge_litert = None
 
 try:
+    import britekit
+except:
+    # allow use without britekit
+    britekit = None
+
+try:
     import timm
 except:
     timm = None
@@ -151,6 +157,26 @@ else:
         HawkEars_v010,
     )
     from bioacoustics_model_zoo import hawkears
+
+
+# timm and torchaudio requirement
+class MissingHawkears2Dependency:
+    """HawkEars dependency missing! try `pip install britekit`"""
+
+    def __init__(self, *args, **kwargs):
+        raise ImportError(
+            "britekit package is required to use this model and at least one was not found in the environment"
+        )
+
+
+if britekit is None:
+
+    @register_bmz_model
+    class HawkEars2(MissingHawkears2Dependency):
+        pass
+
+else:
+    from bioacoustics_model_zoo.hawkears.hawkears2 import HawkEars2
 
 
 class MissingBirdSetDependency:

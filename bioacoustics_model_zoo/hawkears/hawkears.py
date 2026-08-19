@@ -1,27 +1,34 @@
 import warnings
-import pandas as pd
 import numpy as np
+from pathlib import Path
+
 try:
     import cv2
 except Exception as e:
     cv2 = None
-from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
-from opensoundscape.preprocess.actions import Action, BaseAction
-import opensoundscape
-from opensoundscape import Audio, CNN
 
-from bioacoustics_model_zoo.hawkears import hawkears_base_config
-from bioacoustics_model_zoo.hawkears.architecture_constructors import get_hgnet
-from bioacoustics_model_zoo.utils import download_cached_file, download_file
 import torchaudio
-
 import torch
 
+from opensoundscape.preprocess.preprocessors import AudioAugmentationPreprocessor
+from opensoundscape.preprocess.actions import BaseAction
+import opensoundscape
+from opensoundscape import CNN
 from opensoundscape.ml.cnn import register_model_cls
 from opensoundscape.preprocess.actions import register_action_cls
 
-from bioacoustics_model_zoo.hawkears.list_checkpoints import list_hawkears_checkpoints
-from bioacoustics_model_zoo.hawkears.architecture_constructors import create_model
+from bioacoustics_model_zoo.hawkears import hawkears_base_config
+from bioacoustics_model_zoo.hawkears.utils import list_hawkears_checkpoints
+from bioacoustics_model_zoo.hawkears.architecture_constructors import (
+    create_model,
+    get_hgnet,
+)
+import torch
+from bioacoustics_model_zoo.utils import (
+    download_cached_file,
+    register_bmz_model,
+    Ensemble,
+)
 
 
 @register_action_cls
@@ -144,30 +151,6 @@ class HawkEarsSpec(BaseAction):
         sample.data = torch.tensor(spec).unsqueeze(0)
 
 
-import torch
-from bioacoustics_model_zoo.utils import download_file, register_bmz_model
-from pathlib import Path
-
-
-class Ensemble(torch.nn.Module):
-    """Ensemble of multiple models for classification
-
-    Args:
-        models: list of models to use in the ensemble
-    """
-
-    def __init__(self, models):
-        super(Ensemble, self).__init__()
-        self.models = models
-        for i, m in enumerate(models):
-            self.add_module(f"model_{i}", m)
-
-    def forward(self, x):
-        """forward pass through the ensemble, average outputs from across models"""
-        outputs = [model(x) for model in self.models]
-        return torch.mean(torch.stack(outputs), dim=0)
-
-
 @register_bmz_model
 @register_model_cls
 class HawkEars(CNN):
@@ -186,7 +169,7 @@ class HawkEars(CNN):
     ensembled model outputs.
 
     Note that embed() currently uses embeddings from self.network.model_4, the
-    largest of the ensembled inference models. We separately provide the 
+    largest of the ensembled inference models. We separately provide the
     HawkEars_Embedding model, which is a different architecture that according
     to the package maintainer is preferred for embedding and similarity search
     tasks.
@@ -234,7 +217,9 @@ class HawkEars(CNN):
             import timm
             import cv2
         except Exception as e:
-            raise Exception("install the timm and opencv-python packages to use HawkEars (pip install timm opencv-python)") from e
+            raise Exception(
+                "install the timm and opencv-python packages to use HawkEars (pip install timm opencv-python)"
+            ) from e
 
         self.is_lowband_model = load_lowband_model
         self.is_embedding_model = load_embedding_model

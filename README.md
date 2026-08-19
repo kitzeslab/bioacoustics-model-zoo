@@ -115,6 +115,31 @@ scores
 
 # Model list
 
+### [HawkEars V2](https://github.com/jhuus/HawkEars)
+
+
+```
+pip install --upgrade britekit
+```
+
+
+Example: 
+
+```python
+import bioacoustics_model_zoo as bmz
+m = bmz.HawkEars2()
+
+# get dataframe with species, start-end period labels
+m.predict_labels(['test.wav'])
+
+# get fixed-length 3s clip scores for all classes
+m.predict(['test.wav'])
+
+# get scores on 0.25 second frames for all classes
+m.predict_frames(['test.wav'])
+```
+
+
 ### [Perch V2](https://www.kaggle.com/models/google/bird-vocalization-classifier)
 
 Classification and embedding model trained on a large set of annotated bird vocalizations
