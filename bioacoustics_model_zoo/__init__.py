@@ -150,13 +150,13 @@ if timm is None or torchaudio is None:
         pass
 
 else:
-    from bioacoustics_model_zoo.hawkears.hawkears import (
+    from bioacoustics_model_zoo.bmz_hawkears.bmz_hawkears import (
         HawkEars,
         HawkEars_Embedding,
         HawkEars_Low_Band,
         HawkEars_v010,
     )
-    from bioacoustics_model_zoo import hawkears
+    from bioacoustics_model_zoo import bmz_hawkears
 
 
 # timm and torchaudio requirement
@@ -176,7 +176,7 @@ if britekit is None:
         pass
 
 else:
-    from bioacoustics_model_zoo.hawkears.hawkears2 import HawkEars2
+    from bioacoustics_model_zoo.bmz_hawkears.bmz_hawkears2 import HawkEars2
 
 
 class MissingBirdSetDependency:

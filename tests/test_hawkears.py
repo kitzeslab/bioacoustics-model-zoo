@@ -13,7 +13,7 @@ try:
     import torchaudio
     import torch
     import opensoundscape
-    from bioacoustics_model_zoo.hawkears.hawkears import (
+    from bioacoustics_model_zoo.bmz_hawkears.bmz_hawkears import (
         HawkEars,
         HawkEars_Embedding,
         HawkEars_Low_Band,

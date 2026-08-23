@@ -117,28 +117,48 @@ scores
 
 ### [HawkEars V2](https://github.com/jhuus/HawkEars)
 
-
+Install the HawkEars package, with version matching the _model_ version you wish to use
 ```
-pip install --upgrade britekit
+pip install hawkears==2.2.0
 ```
 
-
-Example: 
+Usage: 
 
 ```python
 import bioacoustics_model_zoo as bmz
 m = bmz.HawkEars2()
 
-# get dataframe with species, start-end period labels
-m.predict_labels(['test.wav'])
+# get dataframe with arbitrary-length labels of detected species, one label per row
+# this function applies HawkEars post-processing, such as location/date filtering and score heuristics
+m.label(['test.wav'])
 
-# get fixed-length 3s clip scores for all classes
+# additional customization options include:
+m.label(
+    file,
+    threshold=0.2, #minimum score retained in returned labels
+    include_lowband_classifier=False, # True by default, separate classifier for RUGR/SPGR
+    class_names="scientific", # use alpha, scientific, common, or ebird for class naming convention
+    region="US-PA", # location based filtering, for limited set of supported ebird regions
+    date="0601", #MMDD or YYMMDD of date, for filtering
+)
+
+# create table of all 3s clip scores for all classes
+# no post-processing is applied: returns averaged class outputs across ensembled models
+# output matches other opensoundscape/bmz classifiers 
 m.predict(['test.wav'])
 
 # get scores on 0.25 second frames for all classes
+# no post-processing is applied: returns averaged class outputs across ensembled models
 m.predict_frames(['test.wav'])
+
+# note that in general, you can also initialize the file with a config file with customization of inference parameters (see documentatino on HawkEars repo)
 ```
 
+> Note: the model version always matches the version of the installed HawkEars version! For instance, if you need to use HawkEars v2.2.0 models, run `pip install hawkears==2.2.0`.
+
+> Note: training and embedding are not supported by this implementation of HawkEars v2.x
+
+> HawkEars v1.x models are implemented separately in the `HawkEars` class.
 
 ### [Perch V2](https://www.kaggle.com/models/google/bird-vocalization-classifier)
 

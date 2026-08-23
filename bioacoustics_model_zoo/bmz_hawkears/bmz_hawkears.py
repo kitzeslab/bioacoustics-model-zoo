@@ -17,9 +17,9 @@ from opensoundscape import CNN
 from opensoundscape.ml.cnn import register_model_cls
 from opensoundscape.preprocess.actions import register_action_cls
 
-from bioacoustics_model_zoo.hawkears import hawkears_base_config
-from bioacoustics_model_zoo.hawkears.utils import list_hawkears_checkpoints
-from bioacoustics_model_zoo.hawkears.architecture_constructors import (
+from bioacoustics_model_zoo.bmz_hawkears import hawkears_base_config
+from bioacoustics_model_zoo.bmz_hawkears.utils import list_hawkears_checkpoints
+from bioacoustics_model_zoo.bmz_hawkears.architecture_constructors import (
     create_model,
     get_hgnet,
 )
@@ -154,9 +154,7 @@ class HawkEarsSpec(BaseAction):
 @register_bmz_model
 @register_model_cls
 class HawkEars(CNN):
-    """HawkEars Canadian bird classification CNN v1.0
-
-    Note that the Bioacoustics Model Zoo does not yet support HawkEars v2
+    """HawkEars Canadian bird classification CNN v1.0. See also HawkEars2 v2.x models.
 
     Hawkears[1] was developed by Jan Huus and is actively maintained on the
     [GitHub repository](https://github.com/jhuus/HawkEars1)
