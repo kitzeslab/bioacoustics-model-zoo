@@ -49,6 +49,13 @@ try:
 except:
     transformers = None
 
+try:
+    import sound_event_detection
+    from sound_event_detection.models import FrameDetector
+except:
+    sound_event_detection = None
+
+
 # import with leading underscore to hide from torch.hub.list()
 from opensoundscape import CNN as _CNN
 
@@ -215,6 +222,26 @@ else:
     from bioacoustics_model_zoo.bmz_birdset.bmz_birdset_efficientnetB1 import (
         BirdSetEfficientNetB1,
     )
+
+
+class MissingBirdCODEDependency:
+    """BirdCODE dependency missing! try `pip install opensoundscape`"""
+
+    def __init__(self, *args, **kwargs):
+        raise ImportError(
+            "ESP's sound-event-detection package is required to use this model and was not found in the environment. Install from github:"
+            "`pip install git+https://github.com/earthspecies/sound-event-detection.git`"
+        )
+
+
+if sound_event_detection is None:
+
+    @register_bmz_model
+    class BirdCODE(MissingBirdCODEDependency):
+        pass
+
+else:
+    from bioacoustics_model_zoo.birdcode import BirdCODE
 
 from bioacoustics_model_zoo import rana_sierrae_cnn
 from bioacoustics_model_zoo.rana_sierrae_cnn import RanaSierraeCNN

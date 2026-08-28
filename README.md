@@ -285,6 +285,46 @@ occurrence_model=BirdNETOccurrenceModel()
 occurrence_model.get_species_list(lat=37.419871, lon=-119.153168,week=34,threshold=.1)
 ```
 
+### [BirdCODE](https://github.com/earthspecies/sound-event-detection)
+
+Earth Species Project's BirdCODE sound event detection model
+
+Associated preprint on BioRxiv: https://www.biorxiv.org/content/10.64898/2026.07.31.742086v1 
+
+> Warning: no pinned versions yet, gets the latest version from the github repo
+
+> Warning: Embeddings are very large (188,440 dimensions at frame or clip level)
+
+> Warning: The model is large, and you will likely need to use much smaller batch sizes than with most other bioacoustics models. EG Apple M1 Chip: max batch_size=4.
+
+Installation of required dependency:
+
+```
+pip install git+https://github.com/earthspecies/sound-event-detection
+```
+
+Usage:
+
+```python
+import bioacoustics_model_zoo as bmz
+
+# initialize the model, downloading from HF or using cached checkpoints
+m = bmz.BirdCODE() 
+# optionally use common names/alpha/ebird codes, e.g., `BirdCODE(class_names="common")`
+
+# generate 5s window class prediction scores:
+m.predict(['test.wav'],batch_size=4)
+
+# generate frame-level predictions  (7.6 frames/sec, 38 frames per 5s clip):
+m.predict_frames(['test.wav'])
+
+# extract embeddings for each 5s window:
+m.embed(['test.wav'])
+
+# generate frame-level embeddings
+m.emb(['test.wav'], avgpool=False, return_dfs=False)
+```
+
 ### [Perch](https://tfhub.dev/google/bird-vocalization-classifier/4): 
 
 Embedding and bird classification model trained on Xeno Canto
