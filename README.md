@@ -9,7 +9,7 @@ Suggested Citation
 
 ### Option 1: Install from PyPI (Recommended)
 
-1. Create a python environment (3.9-3.12 supported) using conda or your preferred package manager:
+1. Create a python environment (3.10-3.13 supported) using conda or your preferred package manager:
 
 ```bash
 conda create -n bmz python=3.11
@@ -75,7 +75,7 @@ model = bmz.HawkEars()
 model.predict(audio_files) 
 ```
 
-See a description of each model and basic usage exmple below. Also see the transfer learning tutorials on OpenSoundscape.org for detailed advice on fine-tuning models from the Bioacoustics Model Zoo. 
+See a description of each model and basic usage example below. Also see the transfer learning tutorials on OpenSoundscape.org for detailed advice on fine-tuning models from the Bioacoustics Model Zoo. 
 
 If you encounter an issue or a bug, or would like to request a new feature, make a new "Issue" on the [Github Issues page](https://github.com/kitzeslab/bioacoustics-model-zoo/issues). You can also reach out to Sam (`sam.lapp@pitt.edu`) for more specific inquiries. 
 
@@ -134,7 +134,7 @@ m.label(['test.wav'])
 
 # additional customization options include:
 m.label(
-    file,
+    'test.wav',
     threshold=0.2, #minimum score retained in returned labels
     include_lowband_classifier=False, # True by default, separate classifier for RUGR/SPGR
     class_names="scientific", # use alpha, scientific, common, or ebird for class naming convention
@@ -151,7 +151,7 @@ m.predict(['test.wav'])
 # no post-processing is applied: returns averaged class outputs across ensembled models
 m.predict_frames(['test.wav'])
 
-# note that in general, you can also initialize the file with a config file with customization of inference parameters (see documentatino on HawkEars repo)
+# note that in general, you can also initialize the file with a config file with customization of inference parameters (see documentation on HawkEars repo)
 ```
 
 > Note: the model version always matches the version of the installed HawkEars version! For instance, if you need to use HawkEars v2.2.0 models, run `pip install hawkears==2.2.0`.
@@ -322,7 +322,7 @@ m.predict_frames(['test.wav'])
 m.embed(['test.wav'])
 
 # generate frame-level embeddings
-m.emb(['test.wav'], avgpool=False, return_dfs=False)
+m.embed(['test.wav'], avgpool=False, return_dfs=False)
 ```
 
 ### [Perch](https://tfhub.dev/google/bird-vocalization-classifier/4): 
@@ -334,8 +334,8 @@ Example:
 ```python
 import bioacoustics_model_zoo as bmz
 m = bmz.Perch()
-predictions = model.predict(['test.wav']) # predict on the model's classes
-embeddings = model.embed(['test.wav']) # generate embeddings on each 5 sec of audio
+predictions = m.predict(['test.wav']) # predict on the model's classes
+embeddings = m.embed(['test.wav']) # generate embeddings on each 5 sec of audio
 ```
 
 Training: see `BirdNET` example above, training is equivalent (only trains
@@ -445,6 +445,8 @@ install gsutil then run the following command in your terminal:
 Then, use the model in python:
 ```python
 import bioacoustics_model_zoo as bmz
+from opensoundscape import Audio
+
 # provide the local path to the checkpoint when creating the object
 # this example creates 4 channels; use output_sources8 to separate into 8 channels
 model = bmz.SeparationModel(
