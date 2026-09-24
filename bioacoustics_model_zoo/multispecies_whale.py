@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import warnings
 import numpy as np
+from pathlib import Path
 
 from bioacoustics_model_zoo.utils import (
     AudioSampleArrayDataloader,
@@ -19,20 +20,14 @@ import torch
 
 
 @register_bmz_model
-class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
-    """load the humpback whale NOAA + Google classifier from Kaggle
+class MultiSpeciesWhale(TensorFlowModelWithPytorchClassifier):
+    """load the multi-species hale bioacoustic classifier from Kaggle
 
-    https://www.kaggle.com/models/google/humpback-whale
+    See model card and attributions at: 
+    https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/1
 
-    Model performance is described in :
-    ```
-    A. Allen et al., "A convolutional neural network for automated detection of humpback whale song in a diverse, long-term passive acoustic dataset", Front. Mar. Sci., 2021, doi: 10.3389/fmars.2021.607321.
-
-    M. Harvey, "Acoustic Detection of Humpback Whales Using a Convolutional Neural Network," Google AI Blog, Oct. 29, 2018.
-    ```
-
-    Takes 3.91s audio clips at 24 kHz sample rate and outputs logit scores for 1 class; embedding size is 2048 (ResNet 50)
-
+    Takes 5s audio windows at 24 kHz, performs multi-target classification outputs on 11 classes; embedding shape is 1280 (EfficientNet B0)\
+        
     Terms of Use
     This model has been developed as part of the AI for Nature and Society program
     at Google. The developers request that users adhere to Google’s AI principles,
@@ -42,6 +37,25 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
     remains Apache 2.0.) If you have any questions about appropriate use cases for
     this model, please contact bioacoustics-project@google.com.
 
+    Class Common Name :     Class Code
+    Humpback	            Mn
+    Orca	                Oo  
+    Bryde's	                Be
+    Minke	                Ba
+    Blue	                Bm
+    Fin	                    Bp
+    Right (Atlantic)	    Eg
+    Right (Pacific, upcall)	Upcall
+    Right (Pacific, gunshot)Gunshot
+    Orca echolocation	    Echolocation
+    Orca whistle	        Whistle
+    Orca call	            Call
+
+    > Developer Note: For echolocation, whistle, and call, we do not expect high
+    orca specificity. Nevertheless, we qualified the names with orca because a
+    strong majority of our training data came from that species.
+
+
     Args:
         version: select from released versions on Kaggle [Default: 1]
         device: selects GPU vs CPU for the tensorflow model [Default: None]
@@ -49,21 +63,21 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
     Methods:
         predict: get per-audio-clip per-class scores as pandas DataFrame
         embed: generate embedding layer outputs for samples
-        forward: return selected outputs as a dictionary with keys: 'logit', 'feature', 'pcen_spectrogram', 'custom_classifier'
+        forward: return selected outputs as a dictionary with keys: 'logit', 'feature', 'spectrogram', 'custom_classifier'
 
     Example Usage:
     ```
     import bioacoustics_model_zoo as bmz
-    model=bmz.HumpbackWhale()
+    model=bmz.MultiSpeciesWhale()
     predictions = model.predict(['test.wav'], clip_step=1.0) # generate logit scores for 3.91s audio windows with 1s step size
     model.predict(file, clip_step=1.0, batch_size=32, activation_layer='sigmoid') # 0-1 output scores and >1 batch size (use large batch size for GPUs)
     embeddings = model.embed(['test.wav']) #generate 2048-dimensional embeddings on audio windows
     all_outputs = model.forward(['test.wav']) #get all model outputs including spectrograms and spatial embeddings
-    all_outputs['feature'].shape, all_outputs['logit'].shape, all_outputs['pcen_spectrogram'].shape
+    all_outputs['feature'].shape, all_outputs['logit'].shape, all_outputs['spectrogram'].shape
     ```
 
     Environment setup:
-    HumpbackWhale requires tensorflow and kagglehub packages, which can be installed with
+    MultiSpeciesWhale requires tensorflow and kagglehub packages, which can be installed with
     ```
     pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow kagglehub
     ```
@@ -75,16 +89,18 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
 
     """
 
-    def __init__(self, version=1, device=None):
-        """initialize Humpback Whale BMZ model from TensorFlow Hub
+    def __init__(self, version=1, device=None, use_common_names=False):
+        """initialize MultiSpeciesWhale BMZ model from TensorFlow Hub
 
         Args:
-            version: select from released versions of Google / NOAA Humpback Whale model on Kaggle
+            version: select from released versions of Google Multispecies-Whale model on Kaggle
             device: selects GPU vs CPU for the tensorflow model
                 Note that different models are downloaded from TF Hub for GPU vs CPU usage.
                 - default [None]: uses GPU if available, otherwise CPU
                 - 'cpu': forces CPU usage
                 - 'cuda': forces GPU usage
+            use_common_names: if True, uses common names rather than class codes
+                (see self.class_dict for mapping of class codes to common names)
 
         """
         # only require tensorflow and kagglehub if/when this class is used
@@ -93,7 +109,7 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
             import kagglehub
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
-                """HumpbackWhale requires tensorflow and kagglehub packages >=2.20.0.
+                """MultiSpeciesWhale requires tensorflow and kagglehub packages >=2.20.0.
                 Please install them using:
                 pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow kagglehub
                 """
@@ -111,7 +127,7 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
             self.device = device
 
         tested_versions = (1,)  # as of September 2026
-        handle = f"google/humpback-whale/TensorFlow2/humpback-whale/{version}"
+        handle = f"google/multispecies-whale/TensorFlow2/default/{version}"
 
         if not version in tested_versions:
             warnings.warn(
@@ -123,7 +139,7 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
         with self.tf_device:
             try:
                 model_path = kagglehub.model_download(handle)
-                tf_model = tf.saved_model.load(model_path)
+                tf_model = tf.saved_model.load(Path(model_path) / "multispecies_whale/")
             except Exception as e:
                 raise RuntimeError(
                     f"Failed to load model from KaggleHub at {handle}. "
@@ -131,18 +147,37 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
 
         metadata_fn = tf_model.signatures["metadata"]
         classes = metadata_fn()["class_names"].numpy().astype(str).tolist()
-        sr = metadata_fn()["input_sample_rate"].numpy()  # 10 kHz
-        sample_duration = metadata_fn()["context_width_samples"].numpy() / sr  # 3.92s
+        sr = metadata_fn()["input_sample_rate"].numpy()  # 24 kHz
+        sample_duration = metadata_fn()["context_width_samples"].numpy() / sr  # 5 s
         # initialize parent class with methods for training custom classifier head
         super().__init__(
-            embedding_size=2048,
+            embedding_size=1280,
             classes=classes,
             sample_duration=sample_duration,
             sample_rate=sr,
         )
+        self.class_dict = {
+            "Oo": "Orca",
+            "Mn": "Humpback",
+            "Eg": "Right (Atlantic)",
+            "Be": "Bryde's",
+            "Upcall": "Right (Pacific, upcall)",
+            "Bp": "Fin",
+            "Call": "Orca call",
+            "Gunshot": "Right (Pacific, gunshot)",
+            "Echolocation": "Orca echolocation",
+            "Bm": "Blue",
+            "Whistle": "Orca whistle",
+            "Ba": "Minke",
+        }
+        # ensure same order
+        self.common_names = [self.class_dict[c] for c in self.classes]
+        self.class_codes = self.classes.copy()
+        if use_common_names:
+            self.classes = [self.class_dict[c] for c in self.classes]
 
         # store version number as attribute
-        self.name = "noaa-google-humpack-whale"
+        self.name = "google-multispecies-whale"
         self.version = version
         self.tf_model = tf_model
         self.inference_dataloader_cls = AudioSampleArrayDataloader
@@ -163,7 +198,7 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
     def batch_forward(
         self,
         batch_samples,
-        targets=("logit", "feature", "pcen_spectrogram"),
+        targets=("logit", "feature", "spectrogram"),
         avgpool=False,
     ):
         """run inference on a single batch of samples
@@ -194,7 +229,7 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
             model_outputs = {}
 
             spec = self.tf_model.front_end(waveform)[:, :128, :]
-            model_outputs["pcen_spectrogram"] = spec
+            model_outputs["spectrogram"] = spec
             if "logit" in targets or -1 in targets:
                 model_outputs["logit"] = self.tf_model.logits(spec)
             if "feature" in targets or "custom_classifier" in targets:
@@ -228,7 +263,7 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
         samples,
         progress_bar=True,
         wandb_session=None,
-        targets=("logit", "feature", "pcen_spectrogram"),
+        targets=("logit", "feature", "spectrogram"),
         return_dfs=True,
         clip_step=1.0,
         **dataloader_kwargs,
@@ -246,8 +281,8 @@ class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
             samples: list of file paths, OR pd.DataFrame with index containing audio file paths
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
             wandb_session: wandb.Session object, if provided, logs progress
-            targets: tuple(str,): select from 'logit', 'feature', 'pcen_spectrogram', 'custom_classifier'
-                [default: ('logit','feature','pcen_spectrogram')]
+            targets: tuple(str,): select from 'logit', 'feature', 'spectrogram', 'custom_classifier'
+                [default: ('logit','feature','spectrogram')]
                 Include any combination of the following:
                 - 'logit': logit scores (class predictions) on the species classes
                 - 'feature': 1D feature vectors from the penultimate layer of the network

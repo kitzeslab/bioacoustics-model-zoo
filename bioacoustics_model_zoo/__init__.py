@@ -131,6 +131,7 @@ else:
     from bioacoustics_model_zoo import yamnet
     from bioacoustics_model_zoo import perch, perch_v2
     from bioacoustics_model_zoo.humpback_whale import HumpbackWhale
+    from bioacoustics_model_zoo.multispecies_whale import MultiSpeciesWhale
 
 
 # timm and torchaudio requirement
