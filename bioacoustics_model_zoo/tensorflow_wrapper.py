@@ -3,7 +3,6 @@
 subclassed by BirdNET and Perch
 """
 
-import pandas as pd
 import torch
 
 import opensoundscape
@@ -123,7 +122,7 @@ class TensorFlowModelWithPytorchClassifier(CNN):
     def custom_classifier(self):
         """alias for self.network"""
         return self.network
-    
+
     @property
     def class_outputs_key(self):
         """returns the key in the output dictionary that corresponds to the class outputs
@@ -134,12 +133,10 @@ class TensorFlowModelWithPytorchClassifier(CNN):
             return "custom_classifier"
         else:
             return self._class_outputs_key
-        
-    
+
     @class_outputs_key.setter
     def class_outputs_key(self, new_key):
-        """set the key in the output dictionary that corresponds to the class outputs of the original TF model
-        """
+        """set the key in the output dictionary that corresponds to the class outputs of the original TF model"""
         self._class_outputs_key = new_key
 
     def batch_forward(self, batch_data, targets, avgpool=False):

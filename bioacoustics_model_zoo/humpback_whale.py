@@ -1,49 +1,34 @@
 import platform
-
-from pathlib import Path
-
 import pandas as pd
 import numpy as np
 import torch
 import warnings
 import numpy as np
 
-import opensoundscape
-from opensoundscape.preprocess.actions import Action
 from bioacoustics_model_zoo.utils import (
     AudioSampleArrayDataloader,
     register_bmz_model,
 )
 
+from bioacoustics_model_zoo.utils import register_bmz_model
 from bioacoustics_model_zoo.tensorflow_wrapper import (
     TensorFlowModelWithPytorchClassifier,
 )
 
+import torch
+
 
 @register_bmz_model
-class Perch2(TensorFlowModelWithPytorchClassifier):
-    """load Perch v2.0 from TensorFlow Hub
+class HumpbackWhale(TensorFlowModelWithPytorchClassifier):
+    """load the humpback whale NOAA + Google classifier from Kaggle
 
-    [Perch v2](https://www.kaggle.com/models/google/bird-vocalization-classifier/tensorFlow2/perch_v2)
-    is shared under the [Apache 2.0 License](https://opensource.org/license/apache-2-0/).
-
-    Note: different model checkpoints are downloaded depending on whether device is 'cpu' or 'gpu'.
-    If Device is None, it is set to 'gpu' if torch.cuda.is_available() evaluates to True.
-    If device is 'gpu', a GPU-only model is downloaded. If 'cpu', a CPU-only
-    model is downloaded. The type of model loaded is indicated by `self.device` attribute.
-
-    The model can be used to classify sounds from about 15,000 species (10,000 are birds), or
-    to generate feature embeddings for audio files. It was trained on recordings from Xeno Canto
-    and iNaturalist Sounds.
-
-    The feature extractor is not trainable: you can train classification heads on the embeddings
-    but cannot train the feature extractor weights.
+    https://www.kaggle.com/models/google/humpback-whale
 
     Model performance is described in :
     ```
-    Bart van Merriënboer, Vincent Dumoulin, Jenny Hamer, Lauren Harrell, Andrea
-    Burns and Tom Denton, preprint 2025. "Perch 2.0: The Bittern Lesson for
-    Bioacoustics." biorxiv: https://arxiv.org/pdf/2508.04665
+    A. Allen et al., "A convolutional neural network for automated detection of humpback whale song in a diverse, long-term passive acoustic dataset", Front. Mar. Sci., 2021, doi: 10.3389/fmars.2021.607321.
+
+    M. Harvey, "Acoustic Detection of Humpback Whales Using a Convolutional Neural Network," Google AI Blog, Oct. 29, 2018.
     ```
 
     Note: because TensorFlow Hub implements its own caching system, we do not use the bioacoustics
@@ -52,35 +37,33 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     (see https://www.tensorflow.org/hub/caching#caching_of_compressed_downloads)
 
     Args:
-        version: select from released versions of Perch v2.0 on Kaggle
-            Default: None currently selects "2" for GPU-compatible model or
-            "1" for CPU-compatible model (latest as of October 2025).
+        version: select from released versions on Kaggle [Default: 1]
+        device: selects GPU vs CPU for the tensorflow model [Default: None]
 
     Methods:
         predict: get per-audio-clip per-class scores as pandas DataFrame
         embed: generate embedding layer outputs for samples
-        forward: return all outputs as a dictionary with keys:
+        forward: return selected outputs as a dictionary with keys: 'logit', 'feature', 'pcen_spectrogram', 'custom_classifier'
 
-
-    Example:
+    Example Usage:
     ```
-    import bioacoustics_model_zoo as bm
-    model=bmz.Perch2()
-    predictions = model.predict(['test.wav']) #predict on the model's classes
-    embeddings = model.embed(['test.wav']) #generate embeddings on each 5 sec of audio
+    import bioacoustics_model_zoo as bmz
+    model=bmz.HumpbackWhale()
+    predictions = model.predict(['test.wav'], clip_step=1.0) # generate logit scores for 3.91s audio windows with 1s step size
+    model.predict(file, clip_step=1.0, batch_size=32, activation_layer='sigmoid') # 0-1 output scores and >1 batch size (use large batch size for GPUs)
+    embeddings = model.embed(['test.wav']) #generate 2048-dimensional embeddings on audio windows
     all_outputs = model.forward(['test.wav']) #get all model outputs including spectrograms and spatial embeddings
-    all_outputs['spatial_embedding'].shape # np.array of spatial embeddings
+    all_outputs['feature'].shape, all_outputs['logit'].shape, all_outputs['pcen_spectrogram'].shape
     ```
 
     Environment setup:
-
-    Perch2 requires tensorflow >=2.20.0
+    HumpbackWhale requires tensorflow and kagglehub packages, which can be installed with
     ```
     pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow kagglehub
     ```
     """
 
-    def __init__(self, version=None, device=None):
+    def __init__(self, version=1, device=None):
         """initialize Perch2 BMZ model from TensorFlow Hub
 
         Args:
@@ -108,29 +91,18 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
 
         # which model to load depends on whether GPU is available
         if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = device
-        if device in {
-            "cuda",
-            "xla",
-        }:  # Load GPU-only model (No MPS support as of June 2026)
-            if version is None:
-                version = 2  # latest GPU-compatible as of June 2026
-            tested_versions = (2,)  # as of June 2026
+            if torch.cuda.is_available():
+                self.tf_device = tf.device("GPU")
+                self.device = "cuda"
+            else:
+                self.tf_device = tf.device("CPU")
+                self.device = "cpu"
+        else:
+            self.device = device
 
-            handle = (
-                f"google/bird-vocalization-classifier/tensorFlow2/perch_v2/{version}"
-            )
-            self.tf_device = tf.device("GPU")
-        else:  # CPU-only model
-            if version is None:
-                version = 1  # latest CPU-compatible as of June 2026
-            tested_versions = (1,)  # as of June 2026
-            handle = f"google/bird-vocalization-classifier/tensorFlow2/perch_v2_cpu/{version}"
-            self.tf_device = tf.device("CPU")
+        tested_versions = (1,)  # as of September 2026
+        handle = f"google/humpback-whale/TensorFlow2/humpback-whale/{version}"
 
-        # store Perch2 version number as attribute
-        self.version = version
         if not version in tested_versions:
             warnings.warn(
                 f"version {version} has not been tested on {device}, tested versions: {tested_versions}"
@@ -144,54 +116,31 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 tf_model = tf.saved_model.load(model_path)
             except Exception as e:
                 raise RuntimeError(
-                    f"Failed to load Perch2 model from KaggleHub at {handle}. "
+                    f"Failed to load model from KaggleHub at {handle}. "
                 ) from e
-        csv_files = [
-            f
-            for f in (Path(model_path) / "assets").glob("*.csv")
-            if not f.name.startswith(".")
-        ]
 
-        class_lists = {}
-        for class_list_path in csv_files:
-            try:
-                class_list_name = class_list_path.stem
-                df = pd.read_csv(class_list_path)
-                namespace = df.columns[0]
-                classes = df[namespace].tolist()
-                class_lists[class_list_name] = {
-                    "namespace": namespace,
-                    "classes": classes,
-                }
-            except:
-                print(
-                    f"failed to read class list from {class_list_path.stem}, skipping"
-                )
-
+        metadata_fn = tf_model.signatures["metadata"]
+        classes = metadata_fn()["class_names"].numpy().astype(str).tolist()
+        sr = metadata_fn()["input_sample_rate"].numpy()  # 10 kHz
+        sample_duration = metadata_fn()["context_width_samples"].numpy() / sr  # 3.92s
         # initialize parent class with methods for training custom classifier head
         super().__init__(
-            embedding_size=1536,
-            classes=class_lists["labels"]["classes"],
-            sample_duration=5,
-            sample_rate=32000,
+            embedding_size=2048,
+            classes=classes,
+            sample_duration=sample_duration,
+            sample_rate=sr,
         )
+
+        # store version number as attribute
+        self.name = "noaa-google-humpack-whale"
         self.version = version
-        self.ebird_codes = class_lists["perch_v2_ebird_classes"]["classes"]
         self.tf_model = tf_model
         self.inference_dataloader_cls = AudioSampleArrayDataloader
         self.train_dataloader_cls = AudioSampleArrayDataloader
 
-        # match the resampling method used by Perch / HopLite repo
-        self.preprocessor.pipeline["load_audio"].params["resample_type"] = "polyphase"
-
-        # during inference, Perch rescales with per-sample peak normalization to 0.25
-        # https://github.com/kitzeslab/bioacoustics-model-zoo/issues/30#issuecomment-3134186126
-        self.preprocessor.insert_action(
-            action_index="normalize_signal",
-            action=Action(
-                opensoundscape.Audio.normalize, is_augmentation=False, peak_level=0.25
-            ),
-        )
+        # preprocessing notes:
+        # no specific resampling algorithm is suggested in the Kaggle usage page
+        # during inference, audio could optionally be scaled, but the default is no scaling
 
         # if on a mac, disable XLA JIT to avoid TF hanging behavior (as of TF 2.21.0, March 2026)
         if platform.system() == "Darwin":
@@ -204,7 +153,7 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
     def batch_forward(
         self,
         batch_samples,
-        targets=("label", "embedding", "spatial_embedding", "spectrogram"),
+        targets=("logit", "feature", "pcen_spectrogram"),
         avgpool=False,
     ):
         """run inference on a single batch of samples
@@ -220,28 +169,44 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         Returns:
             dict with keys matching targets, values are np.arrays of outputs
         """
-        data = np.array([s.data.samples for s in batch_samples], dtype=np.float32)
+        import tensorflow as tf
+
+        waveform = tf.convert_to_tensor(
+            np.array([s.data.samples for s in batch_samples], dtype=np.float32),
+            dtype=tf.float32,
+        )
+        waveform = tf.expand_dims(waveform, axis=-1)  # add channel dimension
 
         # call model in context manager so it actually uses the CPU (even if a GPU is available)
+        # we already loaded a single inference clip in each sample; no internal windowing
+        # w = tf.cast(1e12, tf.int64)
         with self.tf_device:
-            model_outputs = self.tf_model.signatures["serving_default"](inputs=data)
+            model_outputs = {}
 
-        if "custom_classifier" in targets or self.use_custom_classifier:
-            emb_tensor = torch.tensor(model_outputs["embedding"]).to(self.device)
-            self.network.to(self.device)
-            custom_classifier = self.network(emb_tensor).detach().cpu().numpy()
-            model_outputs["custom_classifier"] = custom_classifier
+            spec = self.tf_model.front_end(waveform)[:, :128, :]
+            model_outputs["pcen_spectrogram"] = spec
+            if "logit" in targets or -1 in targets:
+                model_outputs["logit"] = self.tf_model.logits(spec)
+            if "feature" in targets or "custom_classifier" in targets:
+                model_outputs["feature"] = self.tf_model.features(spec)
+                if "custom_classifier" in targets or (
+                    -1 in targets and self.use_custom_classifier
+                ):
+                    emb_tensor = torch.tensor(model_outputs["feature"]).to(self.device)
+                    self.network.to(self.device)
+                    custom_classifier = self.network(emb_tensor).detach().cpu()
+                    model_outputs["custom_classifier"] = custom_classifier
 
         # opensoundscape uses reserved key -1 for model outputs e.g. during .predict()
         if -1 in targets:
             if self.use_custom_classifier:
                 model_outputs[-1] = model_outputs["custom_classifier"]
             else:
-                model_outputs[-1] = model_outputs["label"]
+                model_outputs[-1] = model_outputs["logit"]
 
         # only retaining requested outputs
         model_outputs = {
-            k: None if v is None else np.array(v)
+            k: None if v is None else v.numpy()
             for k, v in model_outputs.items()
             if k in targets
         }
@@ -253,8 +218,9 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         samples,
         progress_bar=True,
         wandb_session=None,
-        targets=("label", "embedding", "spatial_embedding", "spectrogram"),
+        targets=("logit", "feature", "pcen_spectrogram"),
         return_dfs=True,
+        clip_step=1.0,
         **dataloader_kwargs,
     ):
         """
@@ -270,25 +236,26 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
             samples: list of file paths, OR pd.DataFrame with index containing audio file paths
             progress_bar: bool, if True, shows a progress bar with tqdm [default: True]
             wandb_session: wandb.Session object, if provided, logs progress
-            targets: tuple(str,): select from 'label', 'embedding',
-                'spatial_embedding', 'spectrogram', 'custom_classifier'
-                [default: ('label','embedding','spatial_embedding','spectrogram')]
+            targets: tuple(str,): select from 'logit', 'feature', 'pcen_spectrogram', 'custom_classifier'
+                [default: ('logit','feature','pcen_spectrogram')]
                 Include any combination of the following:
-                - 'label': logit scores (class predictions) on the species classes
-                - 'embedding': 1D feature vectors from the penultimate layer of the network
+                - 'logit': logit scores (class predictions) on the species classes
+                - 'feature': 1D feature vectors from the penultimate layer of the network
                 - 'spatial_embedding': un-pooled spatial embeddings from the network
                 - 'spectrogram': log-mel spectrograms generated during preprocessing
                 - 'custom_classifier': outputs of the custom classifier head (self.network)
             return_dfs: bool, if True, returns outputs as pd.DataFrame with multi-index like
                 .predict() ('file','start_time','end_time'), if False, returns np.array
                 [default: True]
+            clip_step: float, step size in seconds between subsequent inference windows
+                - default of 1.0 matches the hard-coded values in Kaggle examples
             **dataloader_kwargs: additional keyword arguments passed to the dataloader such
                 as batch_size, num_workers, etc.
 
         Returns: dictionary with content depending on return_values and return_dfs arguments:
             - 'label': pd.DataFrame or np.array of per-clip logits on species classes
                 shape: (num_clips, num_classes)
-            - 'embedding': pd.DataFrame or np.array of per-clip 1D feature vectors
+            - 'feature': pd.DataFrame or np.array of per-clip 1D feature vectors
                 shape: (num_clips, 1536)
             - 'spatial_embedding': np.array of per-clip spatial embeddings
                 shape: (num_clips, 5, 3, 1536)
@@ -296,7 +263,9 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
                 custom classifier head, shape: (num_clips, num_custom_classes)
         """
         # create dataloader to generate batches of AudioSamples
-        dataloader = self.predict_dataloader(samples, **dataloader_kwargs)
+        dataloader = self.predict_dataloader(
+            samples, clip_step=clip_step, **dataloader_kwargs
+        )
 
         # run inference, getting all outputs
         # avoids aggregating unrequested outputs to save memory
@@ -310,15 +279,15 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         # optionally put 1D outputs in DataFrames with multi-index ('file','start_time','end_time')
         # and appropriate column names
         if return_dfs:
-            if "label" in results_dict:
-                results_dict["label"] = pd.DataFrame(
-                    data=results_dict["label"],
+            if "logit" in results_dict:
+                results_dict["logit"] = pd.DataFrame(
+                    data=results_dict["logit"],
                     index=dataloader.dataset.dataset.label_df.index,
                     columns=self._original_classes,
                 )
-            if "embedding" in results_dict:
-                results_dict["embedding"] = pd.DataFrame(
-                    data=results_dict["embedding"],
+            if "feature" in results_dict:
+                results_dict["feature"] = pd.DataFrame(
+                    data=results_dict["feature"],
                     index=dataloader.dataset.dataset.label_df.index,
                     columns=None,
                 )
@@ -332,15 +301,5 @@ class Perch2(TensorFlowModelWithPytorchClassifier):
         return results_dict
 
     def _check_or_get_default_embedding_layer(self, target_layer=None):
-        """only allows 'embedding' or 'spatial_embedding' as target layers
-        Args:
-            target_layer: str or None, select from 'embedding' or 'spatial_embedding'
-                If None, defaults to 'embedding
-
-        Returns:
-            str, the selected target layer
-        """
-        if target_layer == "spatial_embedding":
-            return "spatial_embedding"
-        else:
-            return "embedding"
+        """always "feature" for this model"""
+        return "feature"
