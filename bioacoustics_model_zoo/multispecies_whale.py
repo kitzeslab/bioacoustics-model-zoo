@@ -21,13 +21,13 @@ import torch
 
 @register_bmz_model
 class MultiSpeciesWhale(TensorFlowModelWithPytorchClassifier):
-    """load the multi-species hale bioacoustic classifier from Kaggle
+    """load the Google multi-species whale bioacoustic classifier from Kaggle
 
-    See model card and attributions at: 
+    See model card and attributions at:
     https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/1
 
-    Takes 5s audio windows at 24 kHz, performs multi-target classification outputs on 11 classes; embedding shape is 1280 (EfficientNet B0)\
-        
+    Takes 5s audio windows at 24 kHz, performs multi-target classification outputs on 11 classes; embedding shape is 1280 (EfficientNet B0)
+
     Terms of Use
     This model has been developed as part of the AI for Nature and Society program
     at Google. The developers request that users adhere to Google’s AI principles,
@@ -39,7 +39,7 @@ class MultiSpeciesWhale(TensorFlowModelWithPytorchClassifier):
 
     Class Common Name :     Class Code
     Humpback	            Mn
-    Orca	                Oo  
+    Orca	                Oo
     Bryde's	                Be
     Minke	                Ba
     Blue	                Bm

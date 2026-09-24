@@ -324,6 +324,70 @@ m.embed(['test.wav'])
 # generate frame-level embeddings
 m.embed(['test.wav'], avgpool=False, return_dfs=False)
 ```
+### [MultiSpeciesWhale](https://www.kaggle.com/models/google/multispecies-whale)
+
+Model developed by Google, trained to detect 11 sound types related to whales
+
+See model card and attributions at: 
+https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/1
+
+- tensorflow pb model
+- input is 5s audio windows at 24 kHz
+- performs multi-target classification outputs on 11 classes
+- embedding shape is 1280 (EfficientNet B0)
+    
+Terms of Use:
+This model has been developed as part of the AI for Nature and Society program
+at Google. The developers request that users adhere to Google’s AI principles,
+in particular #1 “Be socially beneficial." in only pursuing applications which
+have societal and/or environmental benefit, as well as wildlife conservation for
+not-for-profit decision-making, education, or research. (The official license
+remains Apache 2.0.) If you have any questions about appropriate use cases for
+this model, please contact bioacoustics-project@google.com.
+
+| Class Common Name | Class Code |
+| :--- | :--- |
+| **Humpback** | Mn |
+| **Orca** | Oo |
+| **Bryde's** | Be |
+| **Minke** | Ba |
+| **Blue** | Bm |
+| **Fin** | Bp |
+| **Right (Atlantic)** | Eg |
+| **Right (Pacific, upcall)** | Upcall |
+| **Right (Pacific, gunshot)** | Gunshot |
+| **Orca echolocation** | Echolocation |
+| **Orca whistle** | Whistle |
+| **Orca call** | Call |
+
+Example Usage:
+```
+import bioacoustics_model_zoo as bmz
+model=bmz.MultiSpeciesWhale()
+
+# generate logit scores for 3.91s audio windows with 1s step size
+predictions = model.predict(['test.wav'], clip_step=1.0) 
+
+# generate 0-1 output scores and increase batch size (use large batch size for GPUs)
+model.predict(file, clip_step=1.0, batch_size=32, activation_layer='sigmoid') 
+
+#generate 2048-dimensional embeddings on audio windows
+embeddings = model.embed(['test.wav']) 
+
+#get all model outputs: spectrograms, logits, embeddings
+all_outputs = model.forward(['test.wav']) 
+all_outputs['feature'].shape, all_outputs['logit'].shape, all_outputs['spectrogram'].shape
+```
+
+Environment setup:
+MultiSpeciesWhale requires tensorflow and kagglehub packages, which can be installed with
+```
+pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow kagglehub
+```
+
+### [HumpbackWhale](https://www.kaggle.com/models/google/humpback-whale)
+Similar API to MultiSpeciesWhale (see above), but has only one output class for Humpback whale detection.
+Model details and attributions: https://www.kaggle.com/models/google/humpback-whale
 
 ### [Perch](https://tfhub.dev/google/bird-vocalization-classifier/4): 
 
