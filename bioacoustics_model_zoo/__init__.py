@@ -55,6 +55,10 @@ try:
 except:
     sound_event_detection = None
 
+try:
+    import batdetect2
+except:
+    batdetect2 = None
 
 # import with leading underscore to hide from torch.hub.list()
 from opensoundscape import CNN as _CNN
@@ -253,3 +257,16 @@ from bioacoustics_model_zoo import rana_sierrae_cnn
 from bioacoustics_model_zoo.rana_sierrae_cnn import RanaSierraeCNN
 from bioacoustics_model_zoo.perch_v2_onnx import Perch2ONNX
 from bioacoustics_model_zoo.birdnet_geomodel import BirdNETGeomodel
+
+if batdetect2 is not None:
+    from bioacoustics_model_zoo.bmz_bat_detect2 import BatDetect2
+else:
+
+    @register_bmz_model
+    class BatDetect2:
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                """batdetect2 package is required to use this model and was not found in the environment. Install with
+                pip install --upgrade --pre batdetect2
+                """
+            )

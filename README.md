@@ -389,6 +389,40 @@ pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow kagglehub
 Similar API to MultiSpeciesWhale (see above), but has only one output class for Humpback whale detection.
 Model details and attributions: https://www.kaggle.com/models/google/humpback-whale
 
+### [BatDetect2](https://github.com/macaodha/batdetect2)
+European bat detection model
+
+Suggested citation:
+```
+@article{batdetect2_2022,
+    title     = {Towards a General Approach for Bat Echolocation Detection and Classification},
+    author    = {Mac Aodha, Oisin and  Mart\'{i}nez Balvanera, Santiago and  Damstra, Elise and  Cooke, Martyn and  Eichinski, Philip and  Browning, Ella and  Barataud, Michel and  Boughey, Katherine and  Coles, Roger and  Giacomini, Giada and MacSwiney G., M. Cristina and  K. Obrist, Martin and Parsons, Stuart and  Sattler, Thomas and  Jones, Kate E.},
+    journal   = {bioRxiv},
+    year      = {2022}
+}
+```
+
+Specify the length of audio to process per sample when initializing the model! You can also choose a checkpoint for a saved model, otherwise a default model trained for European bat species identification is downloaded and used.
+
+Usage:
+```python
+import bioacoustics_model_zoo as bmz
+
+m = bmz.BatDetect2() # defaults to processing 10 seconds at a time
+
+# generate dataframe of detected bat species with class, score, start/end time, low/high frequency
+m.label(['test.wav'], detection_threshold=0.2) 
+
+# generate per-class confidence scores on each audio window (aggregated by max or mean of detections on that window)
+m.predict(['test.wav'],agg='max') 
+
+# detect sound events and return a dataframe of bounding boxes with scores for all classes on each box
+m.detect(['test.wav'], detection_threshold=0.5)
+
+# detect sound events and return 32 features for each bounding box
+m.features(['test.wav'], detection_threshold=0.8) 
+```
+
 ### [Perch](https://tfhub.dev/google/bird-vocalization-classifier/4): 
 
 Embedding and bird classification model trained on Xeno Canto
