@@ -389,6 +389,24 @@ pip install --upgrade opensoundscape bioacoustics-model-zoo tensorflow kagglehub
 Similar API to MultiSpeciesWhale (see above), but has only one output class for Humpback whale detection.
 Model details and attributions: https://www.kaggle.com/models/google/humpback-whale
 
+### [HOWLish](https://github.com/CamposRF/HOWLish)
+Wolf (*Canis lupus*) howl detector for 8 kHz audio, a VGGish CNN fine-tuned on soundscapes from the Iberian Peninsula. `predict()` follows the authors' detection pipeline: scores on back-to-back 0.96 s examples, averaged over 3 examples. The authors keep windows above 0.90 and review 110 s of audio around each one; those review steps (threshold, clips, dropping overlapping clips) are not part of `predict()`, see `detection_pipeline/HOWLish_pipeline.py` in the [authors' repository](https://github.com/CamposRF/HOWLish). Weights: [Zenodo](https://zenodo.org/records/24201346), GPL-3.0-or-later.
+
+Suggested citation:
+```
+Campos, R., Krofel, M., Rio-Maior, H. and Renna, F. (2025) HOWLish: a CNN for automated wolf howl detection. Remote Sensing in Ecology and Conservation 12(1). https://doi.org/10.1002/rse2.70024
+```
+
+Usage:
+```python
+import bioacoustics_model_zoo as bmz
+
+m = bmz.HOWLish()
+scores = m.predict(['test.wav'])  # moving average over 3 examples, as in the paper
+raw = m.predict(['test.wav'], window_size=1)  # one score per 0.96 s example
+candidates = scores[scores['wolf_howl'] > 0.90]
+```
+
 ### [BatDetect2](https://github.com/macaodha/batdetect2)
 European bat detection model
 
