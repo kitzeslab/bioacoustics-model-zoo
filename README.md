@@ -324,6 +324,16 @@ m.embed(['test.wav'])
 # generate frame-level embeddings
 m.embed(['test.wav'], avgpool=False, return_dfs=False)
 ```
+
+Most of BirdCODE's compute and memory goes to its prototype classification head, which scales with the number of classes (~9.4k). If you only need some of them, subset the model once after loading. This modifies the network and `m.classes` in place; scores for the kept classes are unchanged, but inference is faster and uses much less memory (the head shrinks by `n_selected/9422`, so larger batch sizes become possible):
+
+```python
+m = bmz.BirdCODE()
+m.subset_classes(["Turdus migratorius", "Cardinalis cardinalis"])  # names as in m.classes
+m.predict(['test.wav'])  # only these two columns
+```
+The ConvNeXt backbone is unaffected, so the overall speedup depends on how many classes you keep and your hardware.
+
 ### [MultiSpeciesWhale](https://www.kaggle.com/models/google/multispecies-whale)
 
 Model developed by Google, trained to detect 11 sound types related to whales
