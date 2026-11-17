@@ -51,6 +51,8 @@ For a specific version:
 pip install git+https://github.com/kitzeslab/bioacoustics-model-zoo@0.12.2
 ```
 
+To contribute or work on the code, see [development.md](development.md) for setting up a development environment, running tests, and the release procedure.
+
 3. Install additional dependencies as needed:
 ```bash
 # For HawkEars models
