@@ -154,9 +154,11 @@ class YAMNet(TensorFlowModelWithPytorchClassifier):
             sample_array = batch[0].data.samples
             # discard logmelspec return value to avoid large memory usage
             batch_logits, batch_embeddings, batch_specs = self.tf_model(sample_array)
-            logits.extend(batch_logits.numpy().tolist())
-            embeddings.extend(batch_embeddings.numpy().tolist())
-            logmelspecs.extend(batch_specs.numpy().tolist())
+            # keep per-batch numpy arrays (float32) and concatenate once at the end:
+            # converting via python lists is slow and upcasts to float64
+            logits.append(batch_logits.numpy())
+            embeddings.append(batch_embeddings.numpy())
+            logmelspecs.append(batch_specs.numpy())
 
             # frames of returned scores start every 0.48 sec, and are 0.96 sec long
             # the batch start/end time are determined by self.input_duration
@@ -180,10 +182,13 @@ class YAMNet(TensorFlowModelWithPytorchClassifier):
                     }
                 )
 
+        def _concat(arrays):
+            return np.concatenate(arrays, axis=0) if len(arrays) > 0 else np.array([])
+
         return (
-            np.array(logits),
-            np.array(embeddings),
-            np.array(logmelspecs),
+            _concat(logits),
+            _concat(embeddings),
+            _concat(logmelspecs),
             start_times,
             files,
         )
